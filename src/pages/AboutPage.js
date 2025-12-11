@@ -10,7 +10,7 @@ import {
   IconButton,
   Card,
   CardContent,
-  Grid2,
+  Grid,
   Avatar,
 } from "@mui/material";
 import { ArrowBack as ArrowBackIcon, Chat as ChatIcon } from "@mui/icons-material";
@@ -150,8 +150,8 @@ const AboutPage = () => {
           <Typography variant="h4" sx={{ fontWeight: 600, mb: 4, textAlign: "center" }}>
             Our Values
           </Typography>
-          <Grid2 container spacing={3} sx={{ mb: 4 }}>
-            <Grid2 size={{ xs: 12, md: 4 }}>
+          <Grid container spacing={3} sx={{ mb: 4 }}>
+            <Grid item xs={12} md={4}>
               <Card
                 sx={{
                   height: "100%",
@@ -169,8 +169,8 @@ const AboutPage = () => {
                   </Typography>
                 </CardContent>
               </Card>
-            </Grid2>
-            <Grid2 size={{ xs: 12, md: 4 }}>
+            </Grid>
+            <Grid item xs={12} md={4}>
               <Card
                 sx={{
                   height: "100%",
@@ -188,8 +188,8 @@ const AboutPage = () => {
                   </Typography>
                 </CardContent>
               </Card>
-            </Grid2>
-            <Grid2 size={{ xs: 12, md: 4 }}>
+            </Grid>
+            <Grid item xs={12} md={4}>
               <Card
                 sx={{
                   height: "100%",
@@ -207,8 +207,8 @@ const AboutPage = () => {
                   </Typography>
                 </CardContent>
               </Card>
-            </Grid2>
-          </Grid2>
+            </Grid>
+          </Grid>
 
           {/* Disclaimer */}
           <Card
@@ -266,8 +266,8 @@ const AboutPage = () => {
         }}
       >
         <Container maxWidth="lg">
-          <Grid2 container spacing={4}>
-            <Grid2 size={{ xs: 12, md: 6 }}>
+          <Grid container spacing={4}>
+            <Grid item xs={12} md={6}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
                 <img
                   src={process.env.PUBLIC_URL + "/logo.png"}
@@ -281,8 +281,8 @@ const AboutPage = () => {
               <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 © {new Date().getFullYear()} Krishna Consciousness Society. All rights reserved.
               </Typography>
-            </Grid2>
-            <Grid2 size={{ xs: 12, md: 6 }}>
+            </Grid>
+            <Grid item xs={12} md={6}>
               <Box sx={{ display: "flex", gap: 2, justifyContent: { xs: "flex-start", md: "flex-end" } }}>
                 <Button
                   sx={{ color: "text.secondary" }}
@@ -297,8 +297,8 @@ const AboutPage = () => {
                   Terms of Service
                 </Button>
               </Box>
-            </Grid2>
-          </Grid2>
+            </Grid>
+          </Grid>
         </Container>
       </Box>
     </Box>

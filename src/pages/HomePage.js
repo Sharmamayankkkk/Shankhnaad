@@ -12,7 +12,7 @@ import {
   Fade,
   Card,
   CardContent,
-  Grid2,
+  Grid,
 } from "@mui/material";
 import {
   Chat as ChatIcon,
@@ -213,9 +213,9 @@ const HomePage = () => {
         >
           Why Choose Shankhnaad AI?
         </Typography>
-        <Grid2 container spacing={4}>
+        <Grid container spacing={4}>
           {features.map((feature, index) => (
-            <Grid2 size={{ xs: 12, md: 4 }} key={index}>
+            <Grid item xs={12} md={4} key={index}>
               <MotionCard
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -242,9 +242,9 @@ const HomePage = () => {
                   </Typography>
                 </CardContent>
               </MotionCard>
-            </Grid2>
+            </Grid>
           ))}
-        </Grid2>
+        </Grid>
       </Container>
 
       {/* About Section */}
@@ -283,8 +283,8 @@ const HomePage = () => {
         }}
       >
         <Container maxWidth="lg">
-          <Grid2 container spacing={4}>
-            <Grid2 size={{ xs: 12, md: 4 }}>
+          <Grid container spacing={4}>
+            <Grid item xs={12} md={4}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
                 <img
                   src={process.env.PUBLIC_URL + "/logo.png"}
@@ -298,8 +298,8 @@ const HomePage = () => {
               <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 Your spiritual guide powered by AI. Bringing ancient wisdom to the modern world.
               </Typography>
-            </Grid2>
-            <Grid2 size={{ xs: 12, md: 4 }}>
+            </Grid>
+            <Grid item xs={12} md={4}>
               <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
                 Quick Links
               </Typography>
@@ -317,8 +317,8 @@ const HomePage = () => {
                   Chat
                 </Button>
               </Box>
-            </Grid2>
-            <Grid2 size={{ xs: 12, md: 4 }}>
+            </Grid>
+            <Grid item xs={12} md={4}>
               <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
                 Legal
               </Typography>
@@ -336,8 +336,8 @@ const HomePage = () => {
                   Terms of Service
                 </Button>
               </Box>
-            </Grid2>
-          </Grid2>
+            </Grid>
+          </Grid>
           <Box sx={{ mt: 4, pt: 4, borderTop: "1px solid rgba(255, 255, 255, 0.1)", textAlign: "center" }}>
             <Typography variant="body2" sx={{ color: "text.secondary" }}>
               © {new Date().getFullYear()} Krishna Consciousness Society. All rights reserved.
