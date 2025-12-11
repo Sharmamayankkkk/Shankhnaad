@@ -1,5 +1,4 @@
 import React from "react";
-import shannadLogo from "../assets/GPT.png";
 
 const MessageBubble = ({ sender, text }) => {
   const isUser = sender === "user";
@@ -12,7 +11,7 @@ const MessageBubble = ({ sender, text }) => {
     <div className={`message-row ${isUser ? "user" : "bot"}`}>
       {!isUser && (
         <div className="bot-avatar">
-          <img src={shannadLogo} alt="Shankhnad" className="bot-logo" />
+          <img src={process.env.PUBLIC_URL + '/logo.png'} alt="Shankhnad" className="bot-logo" />
         </div>
       )}
       <div className="message-bubble">

@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef } from "react";
-import logo from "../assets/GPT.png";
 import MessageBubble from "./messageBubble";
 
 const ChatWindow = ({ messages, isTyping }) => {
@@ -19,7 +18,7 @@ const ChatWindow = ({ messages, isTyping }) => {
     <div className="chat-window">
       {showEmpty && (
         <div className="empty-state">
-          <img src={logo} alt="Logo" className="empty-logo" />
+          <img src={process.env.PUBLIC_URL + '/logo.png'} alt="Shankhnaad AI" className="empty-logo" />
           <div className="empty-text">Hare Krishna. Jai Srila Prabhupada. I am Shankhnad — how can I help you?</div>
         </div>
       )}

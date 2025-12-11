@@ -1,12 +1,11 @@
 import React from "react";
-import shannadLogo from "../assets/GPT.png";
 
 const Sidebar = ({ isOpen, onNewChat, conversations = [], activeId, onOpen, onToggle, onDeleteConversation }) => {
   return (
     <div className={`sidebar ${isOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
       <div className="sidebar-header">
         <div className="sidebar-logo-container">
-          <img src={shannadLogo} alt="Shankhnad Logo" className="sidebar-logo-img" />
+          <img src={process.env.PUBLIC_URL + '/logo.png'} alt="Shankhnad Logo" className="sidebar-logo-img" />
         </div>
         <div className="sidebar-title">Shankhnad</div>
       </div>

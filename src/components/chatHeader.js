@@ -1,5 +1,4 @@
 import React from "react";
-import logo from "../assets/GPT.png";
 
 export default function ChatHeader({ toggleSidebar, isSidebarOpen }) {
   return (
@@ -15,7 +14,7 @@ export default function ChatHeader({ toggleSidebar, isSidebarOpen }) {
         <span className="sidebar-toggle-bar" />
       </button>
       <div className="header-content">
-        <img src={logo} alt="Logo" className="chat-logo-img" />
+        <img src={process.env.PUBLIC_URL + '/logo.png'} alt="Shankhnaad AI" className="chat-logo-img" />
         <h2>Chat</h2>
       </div>
     </div>
