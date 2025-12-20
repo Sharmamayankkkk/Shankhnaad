@@ -15,10 +15,9 @@ import gitaDataRaw from './data/gita_data.json';
 
 /* --- CONFIGURATION --- */
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY || ""; 
-const SPIRITUAL_ART_PROMPT_PREFIX = "High quality, detailed, artistic: ";
 
 // Image generation messages
-const IMAGE_GEN_SUCCESS_MSG = "I have manifested this divine vision for you using Stable Diffusion. 🎨✨\n\n*Powered by Pollinations.ai*";
+const IMAGE_GEN_SUCCESS_MSG = "I have manifested this divine vision for you using Stable Diffusion. 🎨✨";
 const IMAGE_GEN_FALLBACK_MSG = "🎨 **Placeholder Artwork Generated**\n\nStable Diffusion service is currently unavailable. Showing artistic placeholder instead.\n\n💡 The app uses Pollinations.ai for free Stable Diffusion image generation. Please try again in a moment.";
 
 // Explicit content filter
@@ -137,9 +136,67 @@ const callGeminiAPI = async (history, currentPrompt, mediaFile, contextVerse) =>
   }
 };
 
+const enhancePromptWithGemini = async (userPrompt) => {
+  // Use Gemini to enhance the user's image prompt for better Stable Diffusion results
+  try {
+    console.log("✨ Enhancing prompt with Gemini AI...");
+    
+    const enhancementInstruction = `You are an expert at writing image generation prompts for Stable Diffusion AI.
+    
+The user wants to generate an image with this request: "${userPrompt}"
+
+Please enhance this into a detailed, optimized Stable Diffusion prompt that will produce the best results. Follow these guidelines:
+1. Keep the core subject and intent of the user's request
+2. Add relevant artistic style, lighting, composition details
+3. Include quality tags like "high quality", "detailed", "professional"
+4. Keep it under 150 words
+5. Return ONLY the enhanced prompt text, nothing else
+6. Do not include negative prompts or technical parameters
+
+Enhanced prompt:`;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: enhancementInstruction }] }],
+          generationConfig: { 
+            temperature: 0.8, 
+            maxOutputTokens: 200,
+            topP: 0.95,
+            topK: 40
+          }
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      console.warn("⚠️ Prompt enhancement failed, using original prompt");
+      return userPrompt;
+    }
+
+    const data = await response.json();
+    const enhancedPrompt = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    
+    if (enhancedPrompt && enhancedPrompt.length > 0) {
+      console.log("✅ Prompt enhanced successfully!");
+      console.log("📝 Original:", userPrompt);
+      console.log("✨ Enhanced:", enhancedPrompt);
+      return enhancedPrompt;
+    }
+    
+    return userPrompt;
+  } catch (error) {
+    console.error("❌ Prompt enhancement error:", error);
+    return userPrompt; // Fallback to original prompt
+  }
+};
+
 const callStableDiffusionAPI = async (prompt) => {
   // Image generation using Stable Diffusion via Pollinations.ai
-  // With content filtering and proper URL handling
+  // With Gemini prompt enhancement, content filtering and proper URL handling
   
   try {
     console.log("🎨 Generating AI image with Stable Diffusion:", prompt);
@@ -150,12 +207,12 @@ const callStableDiffusionAPI = async (prompt) => {
       return null;
     }
     
-    // Clean the prompt - add artistic style prefix
-    const cleanPrompt = `${SPIRITUAL_ART_PROMPT_PREFIX}${prompt}`;
-    console.log("📝 Prompt:", cleanPrompt);
+    // Enhance prompt with Gemini for better results
+    const enhancedPrompt = await enhancePromptWithGemini(prompt);
+    console.log("📝 Using enhanced prompt for generation");
     
     // Use Pollinations.ai with direct URL embedding
-    const encodedPrompt = encodeURIComponent(cleanPrompt);
+    const encodedPrompt = encodeURIComponent(enhancedPrompt);
     const seed = Date.now(); // Use timestamp as seed for uniqueness
     
     // Generate image URL
@@ -403,7 +460,7 @@ const HelpModal = ({ isOpen, onClose }) => {
 };
 
 // 3. MESSAGE COMPONENT
-const MessageItem = ({ msg, index, onEdit, onRegenerate, onFeedback, onReport, addToast }) => {
+const MessageItem = ({ msg, index, onEdit, onRegenerate, onFeedback, onReport, addToast, onImageClick }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(msg.content);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -489,7 +546,13 @@ const MessageItem = ({ msg, index, onEdit, onRegenerate, onFeedback, onReport, a
 
           {msg.generatedImage && (
             <div className="mt-2 relative group">
-              <img src={msg.generatedImage} alt="AI Generated" className="max-w-xs md:max-w-md rounded-xl border border-[#444746] shadow-2xl" />
+              <img 
+                src={msg.generatedImage} 
+                alt="AI Generated" 
+                className="w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg rounded-xl border border-[#444746] shadow-2xl cursor-pointer hover:opacity-90 transition-opacity" 
+                onClick={() => onImageClick && onImageClick(msg.generatedImage)}
+                title="Click to view full size"
+              />
               <button 
                 onClick={async () => {
                   try {
@@ -639,6 +702,8 @@ export default function App() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [activeReportId, setActiveReportId] = useState(null);
   const [toasts, setToasts] = useState([]);
+  const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [currentImageUrl, setCurrentImageUrl] = useState(null);
 
   const addToast = (msg, type = 'success') => {
     const id = Date.now();
@@ -972,7 +1037,20 @@ export default function App() {
                    </div>
                 )}
                 {messages.map((msg, idx) => (
-                  <MessageItem key={idx} index={idx} msg={msg} onEdit={handleEdit} onRegenerate={handleRegenerate} onFeedback={handleFeedback} onReport={(id) => { setActiveReportId(id); setReportModalOpen(true); }} addToast={addToast} />
+                  <MessageItem 
+                    key={idx} 
+                    index={idx} 
+                    msg={msg} 
+                    onEdit={handleEdit} 
+                    onRegenerate={handleRegenerate} 
+                    onFeedback={handleFeedback} 
+                    onReport={(id) => { setActiveReportId(id); setReportModalOpen(true); }} 
+                    addToast={addToast}
+                    onImageClick={(url) => {
+                      setCurrentImageUrl(url);
+                      setImageModalOpen(true);
+                    }}
+                  />
                 ))}
                 {isTyping && <div className="flex gap-4 ml-2"><img src="/logo.png" alt="Shankhnaad Logo" className="w-8 h-8 opacity-50 animate-pulse rounded-full"/><span className="text-gray-500 text-sm mt-2 flex items-center gap-2">Consulting scriptures <Loader2 size={12} className="animate-spin"/></span></div>}
               </div>
@@ -1016,6 +1094,51 @@ export default function App() {
             <div className="bg-[#131314] p-4 rounded-lg mb-4 text-xs text-gray-400 max-h-60 overflow-auto border border-[#444746]">{currentShareChat.messages.map(m => `${m.role}: ${m.content}`).join('\n\n')}</div>
             <div className="flex gap-2"><button onClick={() => { navigator.clipboard.writeText(currentShareChat.messages.map(m => m.content).join('\n')); addToast('Transcript copied', 'success'); setShareModalOpen(false); }} className="flex-1 bg-[#004a77] text-white py-2 rounded-full hover:bg-[#005c94] transition-colors">Copy Transcript</button></div>
         </ModalWrapper>
+      )}
+
+      {imageModalOpen && currentImageUrl && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" onClick={() => setImageModalOpen(false)}>
+          <div className="relative max-w-7xl max-h-[90vh] w-full h-full flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <button 
+              onClick={() => setImageModalOpen(false)}
+              className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-black/80 rounded-full text-white z-10 transition-colors"
+              title="Close"
+            >
+              <X size={24} />
+            </button>
+            <img 
+              src={currentImageUrl} 
+              alt="Full size preview" 
+              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              onClick={async () => {
+                try {
+                  const response = await fetch(currentImageUrl);
+                  const blob = await response.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `shankhnaad-${Date.now()}.png`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  window.URL.revokeObjectURL(url);
+                  addToast('Image downloaded', 'success');
+                } catch (error) {
+                  console.error('Download failed:', error);
+                  addToast('Download failed', 'error');
+                }
+              }}
+              className="absolute bottom-4 right-4 p-3 bg-black/50 hover:bg-black/80 rounded-full text-white z-10 transition-colors flex items-center gap-2"
+              title="Download image"
+            >
+              <Download size={20} />
+              <span className="hidden sm:inline">Download</span>
+            </button>
+          </div>
+        </div>
       )}
 
       <style>{`
