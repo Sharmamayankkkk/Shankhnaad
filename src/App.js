@@ -24,6 +24,12 @@ const IMAGE_GEN_FALLBACK_MSG = "🎨 **Placeholder Artwork Generated**\n\nStable
 // Explicit content filter
 const EXPLICIT_KEYWORDS = ['nude', 'naked', 'nsfw', 'explicit', 'porn', 'sex', 'violence', 'gore', 'blood'];
 
+// Helper function to check for explicit content
+const containsExplicitContent = (text) => {
+  const lowerText = text.toLowerCase();
+  return EXPLICIT_KEYWORDS.some(keyword => lowerText.includes(keyword));
+};
+
 /* --- 1. LOCAL DATA & SEARCH ENGINE (RAG) --- */
 const getVerses = () => {
   if (Array.isArray(gitaDataRaw)) return gitaDataRaw;
@@ -139,10 +145,7 @@ const callStableDiffusionAPI = async (prompt) => {
     console.log("🎨 Generating AI image with Stable Diffusion:", prompt);
     
     // Content filtering - block explicit content
-    const lowerPrompt = prompt.toLowerCase();
-    const hasExplicitContent = EXPLICIT_KEYWORDS.some(keyword => lowerPrompt.includes(keyword));
-    
-    if (hasExplicitContent) {
+    if (containsExplicitContent(prompt)) {
       console.warn("🚫 Blocked explicit content request");
       return null;
     }
@@ -172,12 +175,14 @@ const callStableDiffusionAPI = async (prompt) => {
       const blobUrl = URL.createObjectURL(blob);
       
       console.log("✅ Stable Diffusion image generated and cached!");
-      return blobUrl;
+      
+      // Store blob reference for proper cleanup
+      return { url: blobUrl, blob: blob };
       
     } catch (fetchError) {
       console.warn("⚠️ Could not fetch image, using direct URL:", fetchError?.message || fetchError);
       // Fallback to direct URL if fetch fails
-      return imageUrl;
+      return { url: imageUrl, blob: null };
     }
     
   } catch (error) {
@@ -488,17 +493,32 @@ const MessageItem = ({ msg, index, onEdit, onRegenerate, onFeedback, onReport, a
               <button 
                 onClick={async () => {
                   try {
-                    // Fetch the image and download it properly
-                    const response = await fetch(msg.generatedImage);
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `shankhnaad-${Date.now()}.png`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
+                    // Check if it's a blob URL
+                    if (msg.generatedImage.startsWith('blob:')) {
+                      // For blob URLs, fetch and download directly
+                      const response = await fetch(msg.generatedImage);
+                      const blob = await response.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `shankhnaad-${Date.now()}.png`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      window.URL.revokeObjectURL(url);
+                    } else {
+                      // For regular URLs, fetch and download
+                      const response = await fetch(msg.generatedImage);
+                      const blob = await response.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `shankhnaad-${Date.now()}.png`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      window.URL.revokeObjectURL(url);
+                    }
                     addToast('Image downloaded', 'success');
                   } catch (error) {
                     console.error('Download failed:', error);
@@ -776,15 +796,14 @@ export default function App() {
 
       if (isImageGen) {
         // Check for explicit content first
-        const lowerText = text.toLowerCase();
-        const hasExplicitContent = EXPLICIT_KEYWORDS.some(keyword => lowerText.includes(keyword));
-        
-        if (hasExplicitContent) {
+        if (containsExplicitContent(text)) {
           aiResponseText = "🚫 **Content Blocked**\n\nI cannot generate images with explicit or inappropriate content. Please provide a different prompt that aligns with spiritual and positive themes.";
           generatedImageUrl = null;
         } else {
-          generatedImageUrl = await callStableDiffusionAPI(text);
-          if (generatedImageUrl) {
+          const imageResult = await callStableDiffusionAPI(text);
+          if (imageResult) {
+            // Store both URL and blob reference for proper handling
+            generatedImageUrl = imageResult.url;
             aiResponseText = IMAGE_GEN_SUCCESS_MSG;
           } else {
             // Fallback to placeholder art
