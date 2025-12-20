@@ -15,11 +15,14 @@ import gitaDataRaw from './data/gita_data.json';
 
 /* --- CONFIGURATION --- */
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY || ""; 
-const SPIRITUAL_ART_PROMPT_PREFIX = "Spiritual divine art style, Krishna Consciousness Society aesthetic, high quality, detailed: ";
+const SPIRITUAL_ART_PROMPT_PREFIX = "High quality, detailed, artistic: ";
 
 // Image generation messages
-const IMAGE_GEN_SUCCESS_MSG = "I have manifested this divine vision for you using Stable Diffusion. 🎨✨";
+const IMAGE_GEN_SUCCESS_MSG = "I have manifested this divine vision for you using Stable Diffusion. 🎨✨\n\n*Powered by Pollinations.ai*";
 const IMAGE_GEN_FALLBACK_MSG = "🎨 **Placeholder Artwork Generated**\n\nStable Diffusion service is currently unavailable. Showing artistic placeholder instead.\n\n💡 The app uses Pollinations.ai for free Stable Diffusion image generation. Please try again in a moment.";
+
+// Explicit content filter
+const EXPLICIT_KEYWORDS = ['nude', 'naked', 'nsfw', 'explicit', 'porn', 'sex', 'violence', 'gore', 'blood'];
 
 /* --- 1. LOCAL DATA & SEARCH ENGINE (RAG) --- */
 const getVerses = () => {
@@ -129,33 +132,53 @@ const callGeminiAPI = async (history, currentPrompt, mediaFile, contextVerse) =>
 };
 
 const callStableDiffusionAPI = async (prompt) => {
-  // Image generation using Stable Diffusion
-  // Using direct URL embedding approach that bypasses CORS
+  // Image generation using Stable Diffusion via Pollinations.ai
+  // With content filtering and proper URL handling
   
   try {
     console.log("🎨 Generating AI image with Stable Diffusion:", prompt);
     
-    // Clean the prompt
+    // Content filtering - block explicit content
+    const lowerPrompt = prompt.toLowerCase();
+    const hasExplicitContent = EXPLICIT_KEYWORDS.some(keyword => lowerPrompt.includes(keyword));
+    
+    if (hasExplicitContent) {
+      console.warn("🚫 Blocked explicit content request");
+      return null;
+    }
+    
+    // Clean the prompt - add artistic style prefix
     const cleanPrompt = `${SPIRITUAL_ART_PROMPT_PREFIX}${prompt}`;
     console.log("📝 Prompt:", cleanPrompt);
     
     // Use Pollinations.ai with direct URL embedding
-    // This generates a unique URL for each image that can be embedded directly
     const encodedPrompt = encodeURIComponent(cleanPrompt);
     const seed = Date.now(); // Use timestamp as seed for uniqueness
     
-    // Pollinations.ai generates images on-demand via URL
-    // The image URL can be used directly in img src attribute
+    // Generate image URL
     const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&model=flux&nologo=true&enhance=true`;
     
     console.log("🌸 Using Pollinations.ai Stable Diffusion...");
-    console.log("🔗 Image URL:", imageUrl);
     
-    // Return the URL directly - it will work as an img src
-    // The browser will load the image when the URL is set as src
-    console.log("✅ Stable Diffusion image URL generated!");
-    
-    return imageUrl;
+    // Fetch the image and convert to blob to avoid exposing URL
+    try {
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        console.error("❌ Failed to fetch image:", response.status);
+        return null;
+      }
+      
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
+      console.log("✅ Stable Diffusion image generated and cached!");
+      return blobUrl;
+      
+    } catch (fetchError) {
+      console.warn("⚠️ Could not fetch image, using direct URL:", fetchError?.message || fetchError);
+      // Fallback to direct URL if fetch fails
+      return imageUrl;
+    }
     
   } catch (error) {
     console.error("❌ Stable Diffusion generation error:", error?.message || error);
@@ -462,7 +485,31 @@ const MessageItem = ({ msg, index, onEdit, onRegenerate, onFeedback, onReport, a
           {msg.generatedImage && (
             <div className="mt-2 relative group">
               <img src={msg.generatedImage} alt="AI Generated" className="max-w-xs md:max-w-md rounded-xl border border-[#444746] shadow-2xl" />
-              <a href={msg.generatedImage} download="shankhnaad-vision.png" className="absolute bottom-2 right-2 p-2 bg-black/50 hover:bg-black/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"><Download size={16} /></a>
+              <button 
+                onClick={async () => {
+                  try {
+                    // Fetch the image and download it properly
+                    const response = await fetch(msg.generatedImage);
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `shankhnaad-${Date.now()}.png`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    addToast('Image downloaded', 'success');
+                  } catch (error) {
+                    console.error('Download failed:', error);
+                    addToast('Download failed', 'error');
+                  }
+                }}
+                className="absolute bottom-2 right-2 p-2 bg-black/50 hover:bg-black/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                title="Download image"
+              >
+                <Download size={16} />
+              </button>
             </div>
           )}
 
@@ -728,13 +775,22 @@ export default function App() {
       const isImageGen = text.toLowerCase().match(/^(generate|create|draw|make) (an )?image/);
 
       if (isImageGen) {
-        generatedImageUrl = await callStableDiffusionAPI(text);
-        if (generatedImageUrl) {
-          aiResponseText = IMAGE_GEN_SUCCESS_MSG;
+        // Check for explicit content first
+        const lowerText = text.toLowerCase();
+        const hasExplicitContent = EXPLICIT_KEYWORDS.some(keyword => lowerText.includes(keyword));
+        
+        if (hasExplicitContent) {
+          aiResponseText = "🚫 **Content Blocked**\n\nI cannot generate images with explicit or inappropriate content. Please provide a different prompt that aligns with spiritual and positive themes.";
+          generatedImageUrl = null;
         } else {
-          // Fallback to placeholder art
-          generatedImageUrl = generatePlaceholderArt(text);
-          aiResponseText = IMAGE_GEN_FALLBACK_MSG;
+          generatedImageUrl = await callStableDiffusionAPI(text);
+          if (generatedImageUrl) {
+            aiResponseText = IMAGE_GEN_SUCCESS_MSG;
+          } else {
+            // Fallback to placeholder art
+            generatedImageUrl = generatePlaceholderArt(text);
+            aiResponseText = IMAGE_GEN_FALLBACK_MSG;
+          }
         }
       } else {
         const bestVerse = findBestVerse(text);
@@ -806,7 +862,14 @@ export default function App() {
                     <h1 className="text-3xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-orange-400 to-yellow-200">About Shankhnaad AI</h1>
                     <div className="bg-[#1e1f20] p-6 rounded-2xl border border-[#444746] text-left space-y-4">
                        <p className="text-gray-300">Shankhnaad is a spiritual technology initiative by the <strong>Krishna Consciousness Society</strong> bridging the timeless wisdom of the Bhagavad Gita with Generative AI.</p>
-                       <ul className="list-disc pl-5 text-gray-400 space-y-1"><li>Gemini 2.5 Flash for deep reasoning</li><li>Stable Diffusion for divine image generation</li><li>Local RAG with Gita Database</li></ul>
+                       <ul className="list-disc pl-5 text-gray-400 space-y-1">
+                         <li>Gemini 2.5 Flash for deep reasoning</li>
+                         <li>Stable Diffusion (via Pollinations.ai) for AI image generation</li>
+                         <li>Local RAG with Gita Database</li>
+                       </ul>
+                       <div className="mt-4 pt-4 border-t border-[#444746]">
+                         <p className="text-xs text-gray-500">Image Generation: Powered by <a href="https://pollinations.ai" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">Pollinations.ai</a> using Stable Diffusion models</p>
+                       </div>
                     </div>
                 </div>
             </div>
