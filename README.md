@@ -1,15 +1,19 @@
 # Shankhnaad AI - Spiritual Guidance Platform
 
-A spiritual AI chatbot powered by Google's Gemini AI, offering wisdom from the Bhagavad Gita and AI image generation capabilities.
+A spiritual AI chatbot powered by Google's Gemini AI, offering wisdom from the Bhagavad Gita and AI-enhanced image generation capabilities.
 
-## Features
+## ✨ Features
 
 - 💬 **AI Chat**: Powered by Gemini 2.5 Flash for spiritual guidance
-- 🎨 **AI Image Generation**: Create spiritual artwork using Stable Diffusion
+- 🎨 **AI Image Generation**: Create stunning artwork using Stable Diffusion with AI-enhanced prompts
+- 🤖 **Intelligent Detection**: Automatically detects image requests in natural conversation
+- 🖼️ **Image Preview**: Click to view full-size images in modal with download option
 - 📖 **Scripture Integration**: Local RAG with Bhagavad Gita verses
 - 🎙️ **Voice Input**: Speech-to-text for hands-free interaction
 - 🔊 **Text-to-Speech**: Listen to AI responses
-- 📱 **Responsive Design**: Works on desktop and mobile
+- 📱 **Responsive Design**: Optimized for all screen sizes
+- 🎭 **Loading Animations**: Gemini-style loading with video support
+- 🛡️ **Content Safety**: Explicit content filtering
 
 ## Quick Start
 
@@ -32,40 +36,59 @@ A spiritual AI chatbot powered by Google's Gemini AI, offering wisdom from the B
 
 3. Set up environment variables:
    ```bash
-   # Copy .env file and add your API keys
-   # REACT_APP_GEMINI_API_KEY is required for chat
-   # REACT_APP_HF_API_TOKEN is required for image generation
+   # Create .env file and add your Gemini API key
+   # REACT_APP_GEMINI_API_KEY is required for chat and prompt enhancement
    ```
 
-4. Start the development server:
+4. (Optional) Add custom loading animation:
+   ```bash
+   # Place your loading.mp4 video in public/ folder for custom loading animation
+   # Falls back to animated circles if video not found
+   ```
+
+5. Start the development server:
    ```bash
    npm start
    ```
 
-5. Open [http://localhost:3000](http://localhost:3000)
+6. Open [http://localhost:3000](http://localhost:3000)
 
-## 🎨 Image Generation Setup
+## 🎨 Image Generation Features
 
-**Important**: Google's Imagen API is not available through the standard Gemini API. We use Hugging Face's Stable Diffusion as an alternative.
+**Zero Configuration Required!**
 
-For detailed setup instructions, see: **[IMAGE_GENERATION_SETUP.md](./IMAGE_GENERATION_SETUP.md)**
+- ✅ **AI-Enhanced Prompts**: Gemini automatically optimizes your prompts for better results
+- ✅ **Flexible Detection**: Works with "Generate a image", "I want a picture of", "Show me", etc.
+- ✅ **No API Keys**: Uses free Pollinations.ai Stable Diffusion service
+- ✅ **Responsive Images**: Adapts to all screen sizes
+- ✅ **Click-to-View**: Full-size image modal with download
+- ✅ **Content Safety**: Blocks explicit content automatically
 
-Quick setup:
-1. Get a free token from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
-2. Add to `.env`: `REACT_APP_HF_API_TOKEN=your_token_here`
-3. Restart the dev server
+### Example Prompts:
+- "Generate image of Krishna"
+- "I want a picture of a sunset"
+- "Show me a lotus flower"
+- "Can you create a mountain landscape?"
+
+For more details, see: **[IMAGE_GENERATION_SETUP.md](./IMAGE_GENERATION_SETUP.md)**
 
 ## Environment Variables
 
 Create a `.env` file in the root directory:
 
 ```env
-# Required for AI chat functionality
+# Required for AI chat and prompt enhancement
 REACT_APP_GEMINI_API_KEY=your_gemini_api_key
 
-# Required for image generation (see IMAGE_GENERATION_SETUP.md)
-REACT_APP_HF_API_TOKEN=your_huggingface_token
+# Image generation works without any token!
 ```
+
+## 🎭 Custom Loading Animation
+
+To add a custom loading animation:
+1. Place `loading.mp4` in the `public/` folder
+2. The app will automatically use it during AI responses
+3. Falls back to Gemini-style animated circles if video unavailable
 
 ## Getting Started with Create React App
 

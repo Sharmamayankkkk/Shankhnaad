@@ -15,7 +15,19 @@ import gitaDataRaw from './data/gita_data.json';
 
 /* --- CONFIGURATION --- */
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY || ""; 
-const SPIRITUAL_ART_PROMPT_PREFIX = "Spiritual divine art style, Krishna Consciousness Society aesthetic, high quality, detailed: ";
+
+// Image generation messages
+const IMAGE_GEN_SUCCESS_MSG = "I have manifested this divine vision for you using Stable Diffusion. 🎨✨";
+const IMAGE_GEN_FALLBACK_MSG = "🎨 **Placeholder Artwork Generated**\n\nStable Diffusion service is currently unavailable. Showing artistic placeholder instead.\n\n💡 The app uses Pollinations.ai for free Stable Diffusion image generation. Please try again in a moment.";
+
+// Explicit content filter
+const EXPLICIT_KEYWORDS = ['nude', 'naked', 'nsfw', 'explicit', 'porn', 'sex', 'violence', 'gore', 'blood'];
+
+// Helper function to check for explicit content
+const containsExplicitContent = (text) => {
+  const lowerText = text.toLowerCase();
+  return EXPLICIT_KEYWORDS.some(keyword => lowerText.includes(keyword));
+};
 
 /* --- 1. LOCAL DATA & SEARCH ENGINE (RAG) --- */
 const getVerses = () => {
@@ -124,74 +136,115 @@ const callGeminiAPI = async (history, currentPrompt, mediaFile, contextVerse) =>
   }
 };
 
-const callImagenAPI = async (prompt) => {
-  // Image generation using Hugging Face Inference API
-  // Users need to add REACT_APP_HF_API_TOKEN to .env file
-  // Get free token at: https://huggingface.co/settings/tokens
-  
-  const HF_API_TOKEN = process.env.REACT_APP_HF_API_TOKEN;
-  
-  if (!HF_API_TOKEN || HF_API_TOKEN === '') {
-    console.warn("⚠️ Image generation requires REACT_APP_HF_API_TOKEN in .env file");
-    console.log("📝 Get your free token at: https://huggingface.co/settings/tokens");
-    console.log("💡 Add to .env: REACT_APP_HF_API_TOKEN=your_token_here");
-    console.log("🎨 Generating placeholder artwork...");
-    
-    // Generate a beautiful placeholder SVG art instead of returning null
-    return generatePlaceholderArt(prompt);
-  }
-  
+const enhancePromptWithGemini = async (userPrompt) => {
+  // Use Gemini to enhance the user's image prompt for better Stable Diffusion results
   try {
-    console.log("🎨 Generating AI image:", prompt);
+    console.log("✨ Enhancing prompt with Gemini AI...");
     
-    // Using Stable Diffusion via Hugging Face Inference API
+    const enhancementInstruction = `You are an expert at writing image generation prompts for Stable Diffusion AI.
+    
+The user wants to generate an image with this request: "${userPrompt}"
+
+Please enhance this into a detailed, optimized Stable Diffusion prompt that will produce the best results. Follow these guidelines:
+1. Keep the core subject and intent of the user's request
+2. Add relevant artistic style, lighting, composition details
+3. Include quality tags like "high quality", "detailed", "professional"
+4. Keep it under 150 words
+5. Return ONLY the enhanced prompt text, nothing else
+6. Do not include negative prompts or technical parameters
+
+Enhanced prompt:`;
+
     const response = await fetch(
-      "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
       {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${HF_API_TOKEN}`,
-          "Content-Type": "application/json",
-        },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          inputs: `${SPIRITUAL_ART_PROMPT_PREFIX}${prompt}`,
-          options: { wait_for_model: true }
+          contents: [{ parts: [{ text: enhancementInstruction }] }],
+          generationConfig: { 
+            temperature: 0.8, 
+            maxOutputTokens: 200,
+            topP: 0.95,
+            topK: 40
+          }
         }),
       }
     );
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ HuggingFace API Error:", response.status, errorText);
-      
-      if (response.status === 401 || response.status === 403) {
-        console.error("🔑 Invalid or missing API token. Please check REACT_APP_HF_API_TOKEN");
-      } else if (response.status === 503) {
-        console.error("⏳ Model is loading. Please try again in a few moments.");
-      }
-      
-      // Return placeholder art on error
-      return generatePlaceholderArt(prompt);
+      console.warn("⚠️ Prompt enhancement failed, using original prompt");
+      return userPrompt;
     }
 
-    const blob = await response.blob();
-    console.log("✅ AI image generated successfully!");
+    const data = await response.json();
+    const enhancedPrompt = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
     
-    // Convert blob to base64
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
-      reader.onerror = () => {
-        console.error("❌ Error converting image");
-        resolve(generatePlaceholderArt(prompt));
-      };
-      reader.readAsDataURL(blob);
-    });
+    if (enhancedPrompt && enhancedPrompt.length > 0) {
+      console.log("✅ Prompt enhanced successfully!");
+      console.log("📝 Original:", userPrompt);
+      console.log("✨ Enhanced:", enhancedPrompt);
+      return enhancedPrompt;
+    }
+    
+    return userPrompt;
+  } catch (error) {
+    console.error("❌ Prompt enhancement error:", error);
+    return userPrompt; // Fallback to original prompt
+  }
+};
+
+const callStableDiffusionAPI = async (prompt) => {
+  // Image generation using Stable Diffusion via Pollinations.ai
+  // With Gemini prompt enhancement, content filtering and proper URL handling
+  
+  try {
+    console.log("🎨 Generating AI image with Stable Diffusion:", prompt);
+    
+    // Content filtering - block explicit content
+    if (containsExplicitContent(prompt)) {
+      console.warn("🚫 Blocked explicit content request");
+      return null;
+    }
+    
+    // Enhance prompt with Gemini for better results
+    const enhancedPrompt = await enhancePromptWithGemini(prompt);
+    console.log("📝 Using enhanced prompt for generation");
+    
+    // Use Pollinations.ai with direct URL embedding
+    const encodedPrompt = encodeURIComponent(enhancedPrompt);
+    const seed = Date.now(); // Use timestamp as seed for uniqueness
+    
+    // Generate image URL
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&model=flux&nologo=true&enhance=true`;
+    
+    console.log("🌸 Using Pollinations.ai Stable Diffusion...");
+    
+    // Fetch the image and convert to blob to avoid exposing URL
+    try {
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        console.error("❌ Failed to fetch image:", response.status);
+        return null;
+      }
+      
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
+      console.log("✅ Stable Diffusion image generated and cached!");
+      
+      // Store blob reference for proper cleanup
+      return { url: blobUrl, blob: blob };
+      
+    } catch (fetchError) {
+      console.warn("⚠️ Could not fetch image, using direct URL:", fetchError?.message || fetchError);
+      // Fallback to direct URL if fetch fails
+      return { url: imageUrl, blob: null };
+    }
     
   } catch (error) {
-    console.error("❌ Image generation error:", error);
-    // Return placeholder art on error
-    return generatePlaceholderArt(prompt);
+    console.error("❌ Stable Diffusion generation error:", error?.message || error);
+    return null;
   }
 };
 
@@ -398,7 +451,7 @@ const HelpModal = ({ isOpen, onClose }) => {
     <ModalWrapper onClose={onClose}>
         <div className="flex items-center gap-2 mb-4 text-lg font-bold text-white"><HelpCircle size={20}/> Help Center</div>
         <div className="space-y-4 text-sm text-gray-300">
-           <p><strong className="text-white">Image Gen:</strong> Type "Generate an image of..." to create divine art.</p>
+           <p><strong className="text-white">Image Gen:</strong> Type "Generate an image of..." to create divine art with Stable Diffusion (no setup required).</p>
            <p><strong className="text-white">Scripture:</strong> Ask specific questions about Dharma or Karma to query the Gita.</p>
            <p><strong className="text-white">Multimodal:</strong> Upload Images, Audio, or Video using the (+) button for analysis.</p>
         </div>
@@ -407,7 +460,7 @@ const HelpModal = ({ isOpen, onClose }) => {
 };
 
 // 3. MESSAGE COMPONENT
-const MessageItem = ({ msg, index, onEdit, onRegenerate, onFeedback, onReport, addToast }) => {
+const MessageItem = ({ msg, index, onEdit, onRegenerate, onFeedback, onReport, addToast, onImageClick }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(msg.content);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -493,8 +546,53 @@ const MessageItem = ({ msg, index, onEdit, onRegenerate, onFeedback, onReport, a
 
           {msg.generatedImage && (
             <div className="mt-2 relative group">
-              <img src={msg.generatedImage} alt="AI Generated" className="max-w-xs md:max-w-md rounded-xl border border-[#444746] shadow-2xl" />
-              <a href={msg.generatedImage} download="shankhnaad-vision.png" className="absolute bottom-2 right-2 p-2 bg-black/50 hover:bg-black/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"><Download size={16} /></a>
+              <img 
+                src={msg.generatedImage} 
+                alt="AI Generated" 
+                className="w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg rounded-xl border border-[#444746] shadow-2xl cursor-pointer hover:opacity-90 transition-opacity" 
+                onClick={() => onImageClick && onImageClick(msg.generatedImage)}
+                title="Click to view full size"
+              />
+              <button 
+                onClick={async () => {
+                  try {
+                    // Check if it's a blob URL
+                    if (msg.generatedImage.startsWith('blob:')) {
+                      // For blob URLs, fetch and download directly
+                      const response = await fetch(msg.generatedImage);
+                      const blob = await response.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `shankhnaad-${Date.now()}.png`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      window.URL.revokeObjectURL(url);
+                    } else {
+                      // For regular URLs, fetch and download
+                      const response = await fetch(msg.generatedImage);
+                      const blob = await response.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `shankhnaad-${Date.now()}.png`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      window.URL.revokeObjectURL(url);
+                    }
+                    addToast('Image downloaded', 'success');
+                  } catch (error) {
+                    console.error('Download failed:', error);
+                    addToast('Download failed', 'error');
+                  }
+                }}
+                className="absolute bottom-2 right-2 p-2 bg-black/50 hover:bg-black/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                title="Download image"
+              >
+                <Download size={16} />
+              </button>
             </div>
           )}
 
@@ -604,6 +702,8 @@ export default function App() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [activeReportId, setActiveReportId] = useState(null);
   const [toasts, setToasts] = useState([]);
+  const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [currentImageUrl, setCurrentImageUrl] = useState(null);
 
   const addToast = (msg, type = 'success') => {
     const id = Date.now();
@@ -757,18 +857,77 @@ export default function App() {
     try {
       let aiResponseText = "";
       let generatedImageUrl = null;
-      const isImageGen = text.toLowerCase().match(/^(generate|create|draw|make) (an )?image/);
+      
+      // Improved image generation detection
+      // Handles multiple patterns:
+      // - "Generate/Create/Draw/Make/Show/Paint/Illustrate (a/an) image/picture/photo of..."
+      // - "I want/need (a/an) image/picture/photo of..."
+      // - "Can you generate/create/draw/make/show..."
+      // - Flexible article handling (a, an, or none)
+      const lowerText = text.toLowerCase();
+      const isImageGen = 
+        // Direct generation commands
+        /^(generate|create|draw|make|show|paint|illustrate|produce|design)\s+(a|an|me|)?\s*(image|picture|photo|pic|visual|artwork|art)/i.test(text) ||
+        // Request patterns
+        /^(i\s+(want|need|would\s+like)|can\s+you|could\s+you|please)\s+(generate|create|draw|make|show|paint|illustrate|produce|design)/i.test(text) ||
+        // Short forms
+        /^(image|picture|photo|pic)\s+(of|for|showing)/i.test(text) ||
+        // Question forms
+        /^(what\s+would|how\s+would|can\s+you\s+show\s+me)/i.test(text);
 
       if (isImageGen) {
-        generatedImageUrl = await callImagenAPI(text);
-        if (generatedImageUrl) {
-          aiResponseText = "I have manifested this vision for you. 🎨✨";
+        // Check for explicit content first
+        if (containsExplicitContent(text)) {
+          aiResponseText = "🚫 **Content Blocked**\n\nI cannot generate images with explicit or inappropriate content. Please provide a different prompt that aligns with spiritual and positive themes.";
+          generatedImageUrl = null;
         } else {
-          aiResponseText = "🔧 **Image Generation Setup Required**\n\nTo enable AI image generation, please:\n\n1. Get a free Hugging Face API token from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)\n2. Add it to your `.env` file:\n   ```\n   REACT_APP_HF_API_TOKEN=your_token_here\n   ```\n3. Restart the development server\n\n*Note: Google's Imagen API is not available through the standard Gemini API. We use Stable Diffusion via Hugging Face as an alternative.*";
+          const imageResult = await callStableDiffusionAPI(text);
+          if (imageResult) {
+            // Store both URL and blob reference for proper handling
+            generatedImageUrl = imageResult.url;
+            aiResponseText = IMAGE_GEN_SUCCESS_MSG;
+          } else {
+            // Fallback to placeholder art
+            generatedImageUrl = generatePlaceholderArt(text);
+            aiResponseText = IMAGE_GEN_FALLBACK_MSG;
+          }
         }
       } else {
-        const bestVerse = findBestVerse(text);
-        aiResponseText = await callGeminiAPI(currentHistory, text, fileToUpload, bestVerse);
+        // For non-obvious requests, check if user might want an image via AI
+        // This handles conversational requests like "Show me that" or "I'd like to see a picture of what we discussed"
+        const maybeImageRequest = /\b(show|see|look|visualize|picture|image|photo|draw|illustrate)\b/i.test(text) ||
+                                 /\b(what.*look like|how.*appear)\b/i.test(text);
+        
+        if (maybeImageRequest && text.length < 150) {
+          // Quick heuristic: if message is short and contains image-related words, ask AI to clarify
+          const bestVerse = findBestVerse(text);
+          const preliminaryResponse = await callGeminiAPI(currentHistory, text, fileToUpload, bestVerse);
+          
+          // Check if AI's response suggests generating an image would be helpful
+          // If the user's request seems like it wants a visual, generate an image
+          const contextSuggestsImage = 
+            lowerText.includes('show') || 
+            lowerText.includes('see') || 
+            lowerText.includes('picture') ||
+            lowerText.includes('visualize') ||
+            lowerText.includes('look like');
+          
+          if (contextSuggestsImage) {
+            // Generate image based on the request
+            if (!containsExplicitContent(text)) {
+              const imageResult = await callStableDiffusionAPI(text);
+              if (imageResult) {
+                generatedImageUrl = imageResult.url;
+              }
+            }
+          }
+          
+          aiResponseText = preliminaryResponse;
+        } else {
+          // Regular text conversation
+          const bestVerse = findBestVerse(text);
+          aiResponseText = await callGeminiAPI(currentHistory, text, fileToUpload, bestVerse);
+        }
       }
 
       const aiMsg = { 
@@ -836,7 +995,14 @@ export default function App() {
                     <h1 className="text-3xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-orange-400 to-yellow-200">About Shankhnaad AI</h1>
                     <div className="bg-[#1e1f20] p-6 rounded-2xl border border-[#444746] text-left space-y-4">
                        <p className="text-gray-300">Shankhnaad is a spiritual technology initiative by the <strong>Krishna Consciousness Society</strong> bridging the timeless wisdom of the Bhagavad Gita with Generative AI.</p>
-                       <ul className="list-disc pl-5 text-gray-400 space-y-1"><li>Gemini 2.5 Flash for deep reasoning</li><li>Imagen 4.0 for divine image generation</li><li>Local RAG with Gita Database</li></ul>
+                       <ul className="list-disc pl-5 text-gray-400 space-y-1">
+                         <li>Gemini 2.5 Flash for deep reasoning</li>
+                         <li>Stable Diffusion (via Pollinations.ai) for AI image generation</li>
+                         <li>Local RAG with Gita Database</li>
+                       </ul>
+                       <div className="mt-4 pt-4 border-t border-[#444746]">
+                         <p className="text-xs text-gray-500">Image Generation: Powered by <a href="https://pollinations.ai" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">Pollinations.ai</a> using Stable Diffusion models</p>
+                       </div>
                     </div>
                 </div>
             </div>
@@ -871,9 +1037,64 @@ export default function App() {
                    </div>
                 )}
                 {messages.map((msg, idx) => (
-                  <MessageItem key={idx} index={idx} msg={msg} onEdit={handleEdit} onRegenerate={handleRegenerate} onFeedback={handleFeedback} onReport={(id) => { setActiveReportId(id); setReportModalOpen(true); }} addToast={addToast} />
+                  <MessageItem 
+                    key={idx} 
+                    index={idx} 
+                    msg={msg} 
+                    onEdit={handleEdit} 
+                    onRegenerate={handleRegenerate} 
+                    onFeedback={handleFeedback} 
+                    onReport={(id) => { setActiveReportId(id); setReportModalOpen(true); }} 
+                    addToast={addToast}
+                    onImageClick={(url) => {
+                      setCurrentImageUrl(url);
+                      setImageModalOpen(true);
+                    }}
+                  />
                 ))}
-                {isTyping && <div className="flex gap-4 ml-2"><img src="/logo.png" alt="Shankhnaad Logo" className="w-8 h-8 opacity-50 animate-pulse rounded-full"/><span className="text-gray-500 text-sm mt-2 flex items-center gap-2">Consulting scriptures <Loader2 size={12} className="animate-spin"/></span></div>}
+                {isTyping && (
+                  <div className="flex gap-4 ml-2 animate-fade-in">
+                    <div className="flex flex-col items-center">
+                      {/* Gemini-style loading animation */}
+                      <div className="relative w-12 h-12 flex items-center justify-center">
+                        {/* Try to load video first, fallback to animated circles */}
+                        <video 
+                          autoPlay 
+                          loop 
+                          muted 
+                          playsInline
+                          className="w-12 h-12 rounded-full object-cover"
+                          onError={(e) => {
+                            // Hide video if it fails to load
+                            e.target.style.display = 'none';
+                            // Show fallback animation
+                            e.target.nextElementSibling.style.display = 'block';
+                          }}
+                        >
+                          <source src="/loading.mp4" type="video/mp4" />
+                        </video>
+                        {/* Fallback animated circles (Gemini-style) */}
+                        <div className="absolute inset-0 flex items-center justify-center" style={{display: 'none'}}>
+                          <div className="relative w-12 h-12">
+                            <div className="absolute inset-0 rounded-full border-2 border-blue-500/30"></div>
+                            <div className="absolute inset-0 rounded-full border-2 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
+                            <div className="absolute inset-2 rounded-full border-2 border-purple-500/30"></div>
+                            <div className="absolute inset-2 rounded-full border-2 border-t-transparent border-r-purple-500 border-b-transparent border-l-transparent animate-spin" style={{animationDuration: '1.5s', animationDirection: 'reverse'}}></div>
+                            <div className="absolute inset-4 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 opacity-50 animate-pulse"></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1 mt-1">
+                      <span className="text-gray-400 text-sm font-medium">Shankhnaad is thinking...</span>
+                      <div className="flex gap-1">
+                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                        <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                        <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               
               <div className="p-4 bg-[#131314]">
@@ -915,6 +1136,51 @@ export default function App() {
             <div className="bg-[#131314] p-4 rounded-lg mb-4 text-xs text-gray-400 max-h-60 overflow-auto border border-[#444746]">{currentShareChat.messages.map(m => `${m.role}: ${m.content}`).join('\n\n')}</div>
             <div className="flex gap-2"><button onClick={() => { navigator.clipboard.writeText(currentShareChat.messages.map(m => m.content).join('\n')); addToast('Transcript copied', 'success'); setShareModalOpen(false); }} className="flex-1 bg-[#004a77] text-white py-2 rounded-full hover:bg-[#005c94] transition-colors">Copy Transcript</button></div>
         </ModalWrapper>
+      )}
+
+      {imageModalOpen && currentImageUrl && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" onClick={() => setImageModalOpen(false)}>
+          <div className="relative max-w-7xl max-h-[90vh] w-full h-full flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <button 
+              onClick={() => setImageModalOpen(false)}
+              className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-black/80 rounded-full text-white z-10 transition-colors"
+              title="Close"
+            >
+              <X size={24} />
+            </button>
+            <img 
+              src={currentImageUrl} 
+              alt="Full size preview" 
+              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              onClick={async () => {
+                try {
+                  const response = await fetch(currentImageUrl);
+                  const blob = await response.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `shankhnaad-${Date.now()}.png`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  window.URL.revokeObjectURL(url);
+                  addToast('Image downloaded', 'success');
+                } catch (error) {
+                  console.error('Download failed:', error);
+                  addToast('Download failed', 'error');
+                }
+              }}
+              className="absolute bottom-4 right-4 p-3 bg-black/50 hover:bg-black/80 rounded-full text-white z-10 transition-colors flex items-center gap-2"
+              title="Download image"
+            >
+              <Download size={20} />
+              <span className="hidden sm:inline">Download</span>
+            </button>
+          </div>
+        </div>
       )}
 
       <style>{`
