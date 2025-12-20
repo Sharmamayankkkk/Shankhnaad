@@ -135,8 +135,10 @@ const callGeminiAPI = async (history, currentPrompt, mediaFile, contextVerse) =>
       let errorDetails = '';
       try {
         const errorData = await response.json();
-        console.error('[Shankhnaad] API Error Details:', errorData);
-        errorDetails = errorData.error?.message || '';
+        // Only log the error message, not the full response to avoid logging sensitive data
+        const errorMessage = errorData.error?.message || errorData.message || 'Unknown error';
+        console.error('[Shankhnaad] API Error Message:', errorMessage);
+        errorDetails = errorMessage;
       } catch (e) {
         console.error('[Shankhnaad] Could not parse error response');
       }
@@ -213,7 +215,9 @@ const callImagenAPI = async (prompt) => {
       
       try {
         const errorData = await response.json();
-        console.error('[Shankhnaad] Imagen API Error Details:', errorData);
+        // Only log the error message to avoid logging sensitive data
+        const errorMessage = errorData.error?.message || errorData.message || 'Unknown error';
+        console.error('[Shankhnaad] Imagen API Error Message:', errorMessage);
       } catch (e) {
         console.error('[Shankhnaad] Could not parse Imagen error response');
       }
@@ -225,7 +229,7 @@ const callImagenAPI = async (prompt) => {
     const b64 = data.predictions?.[0]?.bytesBase64Encoded;
     
     if (!b64) {
-      console.warn('[Shankhnaad] Imagen API returned no image data:', data);
+      console.warn('[Shankhnaad] Imagen API returned no image data');
     }
     
     return b64 ? `data:image/png;base64,${b64}` : null;
