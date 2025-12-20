@@ -15,6 +15,7 @@ import gitaDataRaw from './data/gita_data.json';
 
 /* --- CONFIGURATION --- */
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY || ""; 
+const SPIRITUAL_ART_PROMPT_PREFIX = "Spiritual divine art style, Krishna Consciousness Society aesthetic, high quality, detailed: ";
 
 /* --- 1. LOCAL DATA & SEARCH ENGINE (RAG) --- */
 const getVerses = () => {
@@ -153,7 +154,7 @@ const callImagenAPI = async (prompt) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          inputs: `Spiritual divine art style, Krishna Consciousness Society aesthetic, high quality, detailed: ${prompt}`,
+          inputs: `${SPIRITUAL_ART_PROMPT_PREFIX}${prompt}`,
           options: { wait_for_model: true }
         }),
       }
@@ -196,7 +197,7 @@ const callImagenAPI = async (prompt) => {
 
 // Generate beautiful placeholder artwork when API is not configured
 const generatePlaceholderArt = (prompt) => {
-  const colors = ['#FF6B35', '#F7931E', '#FDC830', '#4ECDC4', '#44A08D', '#A890FE', '#FF6B6B', '#4ECDC4'];
+  const colors = ['#FF6B35', '#F7931E', '#FDC830', '#4ECDC4', '#44A08D', '#A890FE', '#FF6B6B', '#6C5CE7'];
   const randomColor1 = colors[Math.floor(Math.random() * colors.length)];
   const randomColor2 = colors[Math.floor(Math.random() * colors.length)];
   const randomColor3 = colors[Math.floor(Math.random() * colors.length)];
@@ -300,7 +301,9 @@ const generatePlaceholderArt = (prompt) => {
   `;
   
   // Convert SVG to base64 data URL
-  const base64 = btoa(unescape(encodeURIComponent(svg)));
+  const base64 = btoa(encodeURIComponent(svg).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+    return String.fromCharCode(parseInt(p1, 16));
+  }));
   return `data:image/svg+xml;base64,${base64}`;
 };
 
