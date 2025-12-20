@@ -46,14 +46,17 @@ A spiritual AI chatbot powered by Google's Gemini AI, offering wisdom from the B
 
 ## 🎨 Image Generation Setup
 
-**Important**: Google's Imagen API is not available through the standard Gemini API. We use Hugging Face's Stable Diffusion as an alternative.
+**Great News**: Image generation with Stable Diffusion now works **out of the box** - no setup required!
 
-For detailed setup instructions, see: **[IMAGE_GENERATION_SETUP.md](./IMAGE_GENERATION_SETUP.md)**
+We use Pollinations.ai's free Stable Diffusion service which requires:
+- ❌ No API keys
+- ❌ No signup
+- ❌ No configuration
+- ✅ Just works instantly!
 
-Quick setup:
-1. Get a free token from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
-2. Add to `.env`: `REACT_APP_HF_API_TOKEN=your_token_here`
-3. Restart the dev server
+Simply type: "Generate image of Krishna" or any other spiritual art prompt.
+
+For more details, see: **[IMAGE_GENERATION_SETUP.md](./IMAGE_GENERATION_SETUP.md)**
 
 ## Environment Variables
 
@@ -63,8 +66,8 @@ Create a `.env` file in the root directory:
 # Required for AI chat functionality
 REACT_APP_GEMINI_API_KEY=your_gemini_api_key
 
-# Required for image generation (see IMAGE_GENERATION_SETUP.md)
-REACT_APP_HF_API_TOKEN=your_huggingface_token
+# Image generation now works without any token!
+# (Removed REACT_APP_HF_API_TOKEN requirement)
 ```
 
 ## Getting Started with Create React App

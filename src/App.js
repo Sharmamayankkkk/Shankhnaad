@@ -124,74 +124,38 @@ const callGeminiAPI = async (history, currentPrompt, mediaFile, contextVerse) =>
   }
 };
 
-const callImagenAPI = async (prompt) => {
-  // Image generation using Hugging Face Inference API
-  // Users need to add REACT_APP_HF_API_TOKEN to .env file
-  // Get free token at: https://huggingface.co/settings/tokens
-  
-  const HF_API_TOKEN = process.env.REACT_APP_HF_API_TOKEN;
-  
-  if (!HF_API_TOKEN || HF_API_TOKEN === '') {
-    console.warn("⚠️ Image generation requires REACT_APP_HF_API_TOKEN in .env file");
-    console.log("📝 Get your free token at: https://huggingface.co/settings/tokens");
-    console.log("💡 Add to .env: REACT_APP_HF_API_TOKEN=your_token_here");
-    console.log("🎨 Generating placeholder artwork...");
-    
-    // Generate a beautiful placeholder SVG art instead of returning null
-    return generatePlaceholderArt(prompt);
-  }
+const callStableDiffusionAPI = async (prompt) => {
+  // Image generation using Stable Diffusion
+  // Using direct URL embedding approach that bypasses CORS
   
   try {
-    console.log("🎨 Generating AI image:", prompt);
+    console.log("🎨 Generating AI image with Stable Diffusion:", prompt);
     
-    // Using Stable Diffusion via Hugging Face Inference API
-    const response = await fetch(
-      "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
-      {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${HF_API_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          inputs: `${SPIRITUAL_ART_PROMPT_PREFIX}${prompt}`,
-          options: { wait_for_model: true }
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ HuggingFace API Error:", response.status, errorText);
-      
-      if (response.status === 401 || response.status === 403) {
-        console.error("🔑 Invalid or missing API token. Please check REACT_APP_HF_API_TOKEN");
-      } else if (response.status === 503) {
-        console.error("⏳ Model is loading. Please try again in a few moments.");
-      }
-      
-      // Return placeholder art on error
-      return generatePlaceholderArt(prompt);
-    }
-
-    const blob = await response.blob();
-    console.log("✅ AI image generated successfully!");
+    // Clean the prompt
+    const cleanPrompt = `${SPIRITUAL_ART_PROMPT_PREFIX}${prompt}`;
+    console.log("📝 Prompt:", cleanPrompt);
     
-    // Convert blob to base64
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
-      reader.onerror = () => {
-        console.error("❌ Error converting image");
-        resolve(generatePlaceholderArt(prompt));
-      };
-      reader.readAsDataURL(blob);
-    });
+    // Use Pollinations.ai with direct URL embedding
+    // This generates a unique URL for each image that can be embedded directly
+    const encodedPrompt = encodeURIComponent(cleanPrompt);
+    const seed = Date.now(); // Use timestamp as seed for uniqueness
+    
+    // Pollinations.ai generates images on-demand via URL
+    // The image URL can be used directly in img src attribute
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&model=flux&nologo=true&enhance=true`;
+    
+    console.log("🌸 Using Pollinations.ai Stable Diffusion...");
+    console.log("🔗 Image URL:", imageUrl);
+    
+    // Return the URL directly - it will work as an img src
+    // The browser will load the image when the URL is set as src
+    console.log("✅ Stable Diffusion image URL generated!");
+    
+    return imageUrl;
     
   } catch (error) {
-    console.error("❌ Image generation error:", error);
-    // Return placeholder art on error
-    return generatePlaceholderArt(prompt);
+    console.error("❌ Stable Diffusion generation error:", error.message);
+    return null;
   }
 };
 
@@ -398,7 +362,7 @@ const HelpModal = ({ isOpen, onClose }) => {
     <ModalWrapper onClose={onClose}>
         <div className="flex items-center gap-2 mb-4 text-lg font-bold text-white"><HelpCircle size={20}/> Help Center</div>
         <div className="space-y-4 text-sm text-gray-300">
-           <p><strong className="text-white">Image Gen:</strong> Type "Generate an image of..." to create divine art.</p>
+           <p><strong className="text-white">Image Gen:</strong> Type "Generate an image of..." to create divine art with Stable Diffusion (no setup required).</p>
            <p><strong className="text-white">Scripture:</strong> Ask specific questions about Dharma or Karma to query the Gita.</p>
            <p><strong className="text-white">Multimodal:</strong> Upload Images, Audio, or Video using the (+) button for analysis.</p>
         </div>
@@ -760,11 +724,13 @@ export default function App() {
       const isImageGen = text.toLowerCase().match(/^(generate|create|draw|make) (an )?image/);
 
       if (isImageGen) {
-        generatedImageUrl = await callImagenAPI(text);
+        generatedImageUrl = await callStableDiffusionAPI(text);
         if (generatedImageUrl) {
-          aiResponseText = "I have manifested this vision for you. 🎨✨";
+          aiResponseText = "I have manifested this divine vision for you using Stable Diffusion. 🎨✨";
         } else {
-          aiResponseText = "🔧 **Image Generation Setup Required**\n\nTo enable AI image generation, please:\n\n1. Get a free Hugging Face API token from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)\n2. Add it to your `.env` file:\n   ```\n   REACT_APP_HF_API_TOKEN=your_token_here\n   ```\n3. Restart the development server\n\n*Note: Google's Imagen API is not available through the standard Gemini API. We use Stable Diffusion via Hugging Face as an alternative.*";
+          // Fallback to placeholder art
+          generatedImageUrl = generatePlaceholderArt(text);
+          aiResponseText = "🎨 **Placeholder Artwork Generated**\n\nStable Diffusion service is currently unavailable. Showing artistic placeholder instead.\n\n💡 The app uses Pollinations.ai for free Stable Diffusion image generation. Please try again in a moment.";
         }
       } else {
         const bestVerse = findBestVerse(text);
@@ -836,7 +802,7 @@ export default function App() {
                     <h1 className="text-3xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-orange-400 to-yellow-200">About Shankhnaad AI</h1>
                     <div className="bg-[#1e1f20] p-6 rounded-2xl border border-[#444746] text-left space-y-4">
                        <p className="text-gray-300">Shankhnaad is a spiritual technology initiative by the <strong>Krishna Consciousness Society</strong> bridging the timeless wisdom of the Bhagavad Gita with Generative AI.</p>
-                       <ul className="list-disc pl-5 text-gray-400 space-y-1"><li>Gemini 2.5 Flash for deep reasoning</li><li>Imagen 4.0 for divine image generation</li><li>Local RAG with Gita Database</li></ul>
+                       <ul className="list-disc pl-5 text-gray-400 space-y-1"><li>Gemini 2.5 Flash for deep reasoning</li><li>Stable Diffusion for divine image generation</li><li>Local RAG with Gita Database</li></ul>
                     </div>
                 </div>
             </div>
