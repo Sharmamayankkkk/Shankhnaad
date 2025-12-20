@@ -792,7 +792,23 @@ export default function App() {
     try {
       let aiResponseText = "";
       let generatedImageUrl = null;
-      const isImageGen = text.toLowerCase().match(/^(generate|create|draw|make) (an )?image/);
+      
+      // Improved image generation detection
+      // Handles multiple patterns:
+      // - "Generate/Create/Draw/Make/Show/Paint/Illustrate (a/an) image/picture/photo of..."
+      // - "I want/need (a/an) image/picture/photo of..."
+      // - "Can you generate/create/draw/make/show..."
+      // - Flexible article handling (a, an, or none)
+      const lowerText = text.toLowerCase();
+      const isImageGen = 
+        // Direct generation commands
+        /^(generate|create|draw|make|show|paint|illustrate|produce|design)\s+(a|an|me|)?\s*(image|picture|photo|pic|visual|artwork|art)/i.test(text) ||
+        // Request patterns
+        /^(i\s+(want|need|would\s+like)|can\s+you|could\s+you|please)\s+(generate|create|draw|make|show|paint|illustrate|produce|design)/i.test(text) ||
+        // Short forms
+        /^(image|picture|photo|pic)\s+(of|for|showing)/i.test(text) ||
+        // Question forms
+        /^(what\s+would|how\s+would|can\s+you\s+show\s+me)/i.test(text);
 
       if (isImageGen) {
         // Check for explicit content first
@@ -812,8 +828,41 @@ export default function App() {
           }
         }
       } else {
-        const bestVerse = findBestVerse(text);
-        aiResponseText = await callGeminiAPI(currentHistory, text, fileToUpload, bestVerse);
+        // For non-obvious requests, check if user might want an image via AI
+        // This handles conversational requests like "Show me that" or "I'd like to see a picture of what we discussed"
+        const maybeImageRequest = /\b(show|see|look|visualize|picture|image|photo|draw|illustrate)\b/i.test(text) ||
+                                 /\b(what.*look like|how.*appear)\b/i.test(text);
+        
+        if (maybeImageRequest && text.length < 150) {
+          // Quick heuristic: if message is short and contains image-related words, ask AI to clarify
+          const bestVerse = findBestVerse(text);
+          const preliminaryResponse = await callGeminiAPI(currentHistory, text, fileToUpload, bestVerse);
+          
+          // Check if AI's response suggests generating an image would be helpful
+          // If the user's request seems like it wants a visual, generate an image
+          const contextSuggestsImage = 
+            lowerText.includes('show') || 
+            lowerText.includes('see') || 
+            lowerText.includes('picture') ||
+            lowerText.includes('visualize') ||
+            lowerText.includes('look like');
+          
+          if (contextSuggestsImage) {
+            // Generate image based on the request
+            if (!containsExplicitContent(text)) {
+              const imageResult = await callStableDiffusionAPI(text);
+              if (imageResult) {
+                generatedImageUrl = imageResult.url;
+              }
+            }
+          }
+          
+          aiResponseText = preliminaryResponse;
+        } else {
+          // Regular text conversation
+          const bestVerse = findBestVerse(text);
+          aiResponseText = await callGeminiAPI(currentHistory, text, fileToUpload, bestVerse);
+        }
       }
 
       const aiMsg = { 
