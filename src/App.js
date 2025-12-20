@@ -61,7 +61,16 @@ const fileToGenerativePart = async (file) => {
 };
 
 const callGeminiAPI = async (history, currentPrompt, mediaFile, contextVerse) => {
-  if (!GEMINI_API_KEY) return "Please set REACT_APP_GEMINI_API_KEY in your .env file.";
+  if (!GEMINI_API_KEY) {
+    console.error('[Shankhnaad] GEMINI API KEY is not configured. Please set REACT_APP_GEMINI_API_KEY in your .env file.');
+    return "⚠️ API Key Not Configured: Please set REACT_APP_GEMINI_API_KEY in your .env file to use this feature.";
+  }
+
+  console.log('[Shankhnaad] Calling Gemini API with context:', {
+    hasHistory: history.length > 0,
+    hasMediaFile: !!mediaFile,
+    hasContextVerse: !!contextVerse
+  });
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
   
@@ -114,18 +123,78 @@ const callGeminiAPI = async (history, currentPrompt, mediaFile, contextVerse) =>
       })
     });
 
-    if (!response.ok) throw new Error(`Gemini API Error: ${response.status}`);
+    if (!response.ok) {
+      // Log detailed error information
+      console.error('[Shankhnaad] Gemini API request failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        url: url.split('?')[0] // Log URL without API key
+      });
+      
+      // Try to get error details from response
+      let errorDetails = '';
+      try {
+        const errorData = await response.json();
+        console.error('[Shankhnaad] API Error Details:', errorData);
+        errorDetails = errorData.error?.message || '';
+      } catch (e) {
+        console.error('[Shankhnaad] Could not parse error response');
+      }
+      
+      // Provide specific error messages based on status code
+      if (response.status === 401) {
+        return "⚠️ API Authentication Failed: Your API key appears to be invalid. Please check your REACT_APP_GEMINI_API_KEY in the .env file.";
+      } else if (response.status === 403) {
+        return "⚠️ API Access Forbidden: Your API key doesn't have permission to access this service. Please verify your API key permissions.";
+      } else if (response.status === 429) {
+        return "⚠️ Rate Limit Exceeded: Too many requests to the API. Please wait a moment and try again.";
+      } else if (response.status === 400) {
+        return `⚠️ Invalid Request: The request to the API was malformed. ${errorDetails ? 'Details: ' + errorDetails : 'Please check your input and try again.'}`;
+      } else if (response.status >= 500) {
+        return `⚠️ API Server Error: The Gemini API is experiencing issues (Error ${response.status}). Please try again in a few moments.`;
+      } else {
+        return `⚠️ API Error (${response.status}): Unable to connect to the spiritual guide. ${errorDetails || 'Please try again.'}`;
+      }
+    }
+    
     const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || "I am meditating on that... (No response)";
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!responseText) {
+      console.warn('[Shankhnaad] Empty or invalid response from API:', data);
+      return "I am meditating on that... (No response received from the API)";
+    }
+    
+    return responseText;
   } catch (error) {
-    console.error(error);
-    return "I am having trouble connecting to the spiritual sky. Please check your internet connection.";
+    // Log detailed error for debugging
+    console.error('[Shankhnaad] Gemini API call failed with exception:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
+    
+    // Provide user-friendly error messages based on error type
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      return "⚠️ Network Error: Unable to connect to the Gemini API. Please check your internet connection and try again.";
+    } else if (error.name === 'AbortError') {
+      return "⚠️ Request Timeout: The request took too long to complete. Please try again.";
+    } else if (error.message.includes('JSON')) {
+      return "⚠️ Response Parse Error: Received invalid response from API. Please try again.";
+    } else {
+      return `⚠️ Unexpected Error: ${error.message || 'An unknown error occurred'}. Please try again or contact support if the issue persists.`;
+    }
   }
 };
 
 const callImagenAPI = async (prompt) => {
-  if (!GEMINI_API_KEY) return null;
+  if (!GEMINI_API_KEY) {
+    console.error('[Shankhnaad] Image generation failed: API key not configured');
+    return null;
+  }
+  
   const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${GEMINI_API_KEY}`;
+  
   try {
     const response = await fetch(url, {
       method: 'POST',
@@ -136,12 +205,36 @@ const callImagenAPI = async (prompt) => {
       })
     });
 
-    if (!response.ok) throw new Error(`Imagen Error: ${response.status}`);
+    if (!response.ok) {
+      console.error('[Shankhnaad] Imagen API request failed:', {
+        status: response.status,
+        statusText: response.statusText
+      });
+      
+      try {
+        const errorData = await response.json();
+        console.error('[Shankhnaad] Imagen API Error Details:', errorData);
+      } catch (e) {
+        console.error('[Shankhnaad] Could not parse Imagen error response');
+      }
+      
+      return null;
+    }
+    
     const data = await response.json();
     const b64 = data.predictions?.[0]?.bytesBase64Encoded;
+    
+    if (!b64) {
+      console.warn('[Shankhnaad] Imagen API returned no image data:', data);
+    }
+    
     return b64 ? `data:image/png;base64,${b64}` : null;
   } catch (error) {
-    console.error("Imagen Error", error);
+    console.error('[Shankhnaad] Imagen API call failed with exception:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
     return null;
   }
 };
@@ -516,11 +609,31 @@ export default function App() {
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript;
       setInput(prev => prev + (prev ? " " : "") + transcript);
+      console.log('[Shankhnaad] Speech recognition result:', transcript);
     };
 
     recognition.onerror = (event) => {
-      console.error("Speech error", event.error);
+      console.error('[Shankhnaad] Speech recognition error:', {
+        error: event.error,
+        message: event.message
+      });
+      
       setIsListening(false);
+      
+      // Provide specific error messages
+      if (event.error === 'no-speech') {
+        addToast("No speech detected. Please try again.", "error");
+      } else if (event.error === 'audio-capture') {
+        addToast("Microphone not accessible. Please check permissions.", "error");
+      } else if (event.error === 'not-allowed') {
+        addToast("Microphone permission denied. Please enable it in browser settings.", "error");
+      } else if (event.error === 'network') {
+        addToast("Network error during speech recognition. Check your connection.", "error");
+      } else if (event.error === 'aborted') {
+        addToast("Speech recognition aborted.", "info");
+      } else {
+        addToast(`Speech recognition error: ${event.error}`, "error");
+      }
     };
 
     recognition.onend = () => {
@@ -572,8 +685,12 @@ export default function App() {
         if(currentChatId) updateChat(currentChatId, { messages: updatedMessages });
         addToast('New draft generated', 'success');
 
-      } catch(e) { 
-        addToast('Regeneration failed', 'error'); 
+      } catch(e) {
+        console.error('[Shankhnaad] Regeneration failed:', {
+          error: e.message,
+          stack: e.stack
+        });
+        addToast(`Regeneration failed: ${e.message || 'Unknown error'}`, 'error');
       } finally { setIsTyping(false); }
     }
   };
@@ -603,11 +720,17 @@ export default function App() {
       const isImageGen = text.toLowerCase().match(/^(generate|create|draw|make) (an )?image/);
 
       if (isImageGen) {
+        console.log('[Shankhnaad] Image generation request detected');
         aiResponseText = "I have manifested this vision for you.";
         generatedImageUrl = await callImagenAPI(text);
-        if (!generatedImageUrl) aiResponseText = "Creative energies blocked. Please try again.";
+        
+        if (!generatedImageUrl) {
+          console.warn('[Shankhnaad] Image generation returned null');
+          aiResponseText = "⚠️ Creative energies blocked. The image generation service may be unavailable or rate-limited. Please try again later.";
+        }
       } else {
         const bestVerse = findBestVerse(text);
+        console.log('[Shankhnaad] Processing text request', bestVerse ? `with verse ${bestVerse.CHAPTER}:${bestVerse.VERSE}` : 'without verse context');
         aiResponseText = await callGeminiAPI(currentHistory, text, fileToUpload, bestVerse);
       }
 
@@ -637,8 +760,25 @@ export default function App() {
         }, ...prev]);
       }
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'model', content: "Connection interrupted." }]);
-      addToast('Failed to send message', 'error');
+      console.error('[Shankhnaad] Message send failed:', {
+        error: error.message,
+        name: error.name,
+        stack: error.stack
+      });
+      
+      // Provide more specific error messages
+      let errorMessage = "Connection interrupted.";
+      if (error.name === 'TypeError') {
+        errorMessage = "Network connection failed. Please check your internet connection.";
+      } else if (error.message) {
+        errorMessage = `Error: ${error.message}`;
+      }
+      
+      setMessages(prev => [...prev, { 
+        role: 'model', 
+        content: `⚠️ ${errorMessage}` 
+      }]);
+      addToast('Failed to send message: ' + error.message, 'error');
     } finally {
       setIsTyping(false);
     }
