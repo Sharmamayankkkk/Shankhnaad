@@ -2,12 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { 
   Menu, Plus, MessageSquare, Settings, HelpCircle, Send, Mic, 
-  Image as ImageIcon, User, X, Sparkles, Info, Shield, 
+  Image as ImageIcon, User, X, Sparkles, Info, 
   BookOpen, Trash2, MoreVertical, Pin, Archive, Share2, 
   Download, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw, 
-  Flag, Edit2, ChevronLeft, ChevronRight, AlertTriangle, 
-  Loader2, XCircle, LogOut, Volume2, StopCircle, FileAudio, 
-  FileVideo, File as FileIcon, MicOff
+  Flag, Edit2, ChevronLeft, ChevronRight, 
+  Loader2, XCircle, Volume2, StopCircle, FileAudio, 
+  FileVideo, MicOff
 } from 'lucide-react';
 
 // Import real data for RAG
@@ -205,7 +205,6 @@ const generatePlaceholderArt = (prompt) => {
   // Extract keywords from prompt for customization
   const isKrishna = prompt.toLowerCase().includes('krishna');
   const isLotus = prompt.toLowerCase().includes('lotus');
-  const isSpiritual = prompt.toLowerCase().includes('divine') || prompt.toLowerCase().includes('spiritual') || prompt.toLowerCase().includes('temple');
   
   // Create artistic SVG with spiritual symbols
   const svg = `
@@ -409,7 +408,6 @@ const HelpModal = ({ isOpen, onClose }) => {
 
 // 3. MESSAGE COMPONENT
 const MessageItem = ({ msg, index, onEdit, onRegenerate, onFeedback, onReport, addToast }) => {
-  const [isHovered, setIsHovered] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(msg.content);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -439,12 +437,10 @@ const MessageItem = ({ msg, index, onEdit, onRegenerate, onFeedback, onReport, a
   return (
     <div 
       className={`group flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-6`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
       <div className={`flex max-w-[95%] md:max-w-[85%] gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
         <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-1 ${msg.role === 'user' ? 'bg-[#444746]' : ''}`}>
-          {msg.role === 'user' ? <User size={16} /> : <img src="/logo.png" className="w-8 h-8 rounded-full object-cover" onError={(e) => e.target.style.display='none'} />}
+          {msg.role === 'user' ? <User size={16} /> : <img src="/logo.png" alt="Shankhnaad Logo" className="w-8 h-8 rounded-full object-cover" onError={(e) => e.target.style.display='none'} />}
         </div>
         
         <div className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'} w-full min-w-0`}>
@@ -836,7 +832,7 @@ export default function App() {
           {activePage === 'about' ? (
             <div className="p-8 md:p-12 overflow-y-auto custom-scrollbar animate-fade-in">
                 <div className="max-w-2xl mx-auto text-center">
-                    <img src="/logo.png" className="w-24 h-24 rounded-full mb-6 mx-auto shadow-2xl shadow-orange-500/20" onError={(e) => e.target.style.display='none'}/>
+                    <img src="/logo.png" alt="Shankhnaad Logo" className="w-24 h-24 rounded-full mb-6 mx-auto shadow-2xl shadow-orange-500/20" onError={(e) => e.target.style.display='none'}/>
                     <h1 className="text-3xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-orange-400 to-yellow-200">About Shankhnaad AI</h1>
                     <div className="bg-[#1e1f20] p-6 rounded-2xl border border-[#444746] text-left space-y-4">
                        <p className="text-gray-300">Shankhnaad is a spiritual technology initiative by the <strong>Krishna Consciousness Society</strong> bridging the timeless wisdom of the Bhagavad Gita with Generative AI.</p>
@@ -877,7 +873,7 @@ export default function App() {
                 {messages.map((msg, idx) => (
                   <MessageItem key={idx} index={idx} msg={msg} onEdit={handleEdit} onRegenerate={handleRegenerate} onFeedback={handleFeedback} onReport={(id) => { setActiveReportId(id); setReportModalOpen(true); }} addToast={addToast} />
                 ))}
-                {isTyping && <div className="flex gap-4 ml-2"><img src="/logo.png" className="w-8 h-8 opacity-50 animate-pulse rounded-full"/><span className="text-gray-500 text-sm mt-2 flex items-center gap-2">Consulting scriptures <Loader2 size={12} className="animate-spin"/></span></div>}
+                {isTyping && <div className="flex gap-4 ml-2"><img src="/logo.png" alt="Shankhnaad Logo" className="w-8 h-8 opacity-50 animate-pulse rounded-full"/><span className="text-gray-500 text-sm mt-2 flex items-center gap-2">Consulting scriptures <Loader2 size={12} className="animate-spin"/></span></div>}
               </div>
               
               <div className="p-4 bg-[#131314]">
