@@ -15,6 +15,7 @@ import gitaDataRaw from './data/gita_data.json';
 
 /* --- CONFIGURATION --- */
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY || ""; 
+const SPIRITUAL_ART_PROMPT_PREFIX = "Spiritual divine art style, Krishna Consciousness Society aesthetic, high quality, detailed: ";
 
 /* --- 1. LOCAL DATA & SEARCH ENGINE (RAG) --- */
 const getVerses = () => {
@@ -124,26 +125,186 @@ const callGeminiAPI = async (history, currentPrompt, mediaFile, contextVerse) =>
 };
 
 const callImagenAPI = async (prompt) => {
-  if (!GEMINI_API_KEY) return null;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${GEMINI_API_KEY}`;
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        instances: [{ prompt: `Spiritual, divine art style, Krishna Consciousness Society aesthetic: ${prompt}` }],
-        parameters: { sampleCount: 1 }
-      })
-    });
-
-    if (!response.ok) throw new Error(`Imagen Error: ${response.status}`);
-    const data = await response.json();
-    const b64 = data.predictions?.[0]?.bytesBase64Encoded;
-    return b64 ? `data:image/png;base64,${b64}` : null;
-  } catch (error) {
-    console.error("Imagen Error", error);
-    return null;
+  // Image generation using Hugging Face Inference API
+  // Users need to add REACT_APP_HF_API_TOKEN to .env file
+  // Get free token at: https://huggingface.co/settings/tokens
+  
+  const HF_API_TOKEN = process.env.REACT_APP_HF_API_TOKEN;
+  
+  if (!HF_API_TOKEN || HF_API_TOKEN === '') {
+    console.warn("⚠️ Image generation requires REACT_APP_HF_API_TOKEN in .env file");
+    console.log("📝 Get your free token at: https://huggingface.co/settings/tokens");
+    console.log("💡 Add to .env: REACT_APP_HF_API_TOKEN=your_token_here");
+    console.log("🎨 Generating placeholder artwork...");
+    
+    // Generate a beautiful placeholder SVG art instead of returning null
+    return generatePlaceholderArt(prompt);
   }
+  
+  try {
+    console.log("🎨 Generating AI image:", prompt);
+    
+    // Using Stable Diffusion via Hugging Face Inference API
+    const response = await fetch(
+      "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${HF_API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          inputs: `${SPIRITUAL_ART_PROMPT_PREFIX}${prompt}`,
+          options: { wait_for_model: true }
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ HuggingFace API Error:", response.status, errorText);
+      
+      if (response.status === 401 || response.status === 403) {
+        console.error("🔑 Invalid or missing API token. Please check REACT_APP_HF_API_TOKEN");
+      } else if (response.status === 503) {
+        console.error("⏳ Model is loading. Please try again in a few moments.");
+      }
+      
+      // Return placeholder art on error
+      return generatePlaceholderArt(prompt);
+    }
+
+    const blob = await response.blob();
+    console.log("✅ AI image generated successfully!");
+    
+    // Convert blob to base64
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = () => {
+        console.error("❌ Error converting image");
+        resolve(generatePlaceholderArt(prompt));
+      };
+      reader.readAsDataURL(blob);
+    });
+    
+  } catch (error) {
+    console.error("❌ Image generation error:", error);
+    // Return placeholder art on error
+    return generatePlaceholderArt(prompt);
+  }
+};
+
+// Generate beautiful placeholder artwork when API is not configured
+const generatePlaceholderArt = (prompt) => {
+  const colors = ['#FF6B35', '#F7931E', '#FDC830', '#4ECDC4', '#44A08D', '#A890FE', '#FF6B6B', '#6C5CE7'];
+  const randomColor1 = colors[Math.floor(Math.random() * colors.length)];
+  const randomColor2 = colors[Math.floor(Math.random() * colors.length)];
+  const randomColor3 = colors[Math.floor(Math.random() * colors.length)];
+  
+  // Extract keywords from prompt for customization
+  const isKrishna = prompt.toLowerCase().includes('krishna');
+  const isLotus = prompt.toLowerCase().includes('lotus');
+  const isSpiritual = prompt.toLowerCase().includes('divine') || prompt.toLowerCase().includes('spiritual') || prompt.toLowerCase().includes('temple');
+  
+  // Create artistic SVG with spiritual symbols
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+      <defs>
+        <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" style="stop-color:${randomColor1};stop-opacity:0.9" />
+          <stop offset="100%" style="stop-color:${randomColor2};stop-opacity:1" />
+        </radialGradient>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="5" result="coloredBlur"/>
+          <feMerge>
+            <feMergeNode in="coloredBlur"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+        <linearGradient id="gold" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" style="stop-color:#FFD700;stop-opacity:1" />
+          <stop offset="100%" style="stop-color:#FFA500;stop-opacity:1" />
+        </linearGradient>
+      </defs>
+      
+      <!-- Background -->
+      <rect width="1024" height="1024" fill="url(#bg)"/>
+      
+      <!-- Decorative patterns -->
+      <g opacity="0.15">
+        ${Array.from({length: 8}, (_, i) => `
+          <circle cx="512" cy="512" r="${100 + i * 80}" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+        `).join('')}
+      </g>
+      
+      <!-- Spiritual Symbol -->
+      ${isLotus ? `
+        <!-- Lotus Flower -->
+        <g transform="translate(512, 512)" filter="url(#glow)">
+          ${Array.from({length: 8}, (_, i) => {
+            const angle = (i * 45) * Math.PI / 180;
+            const x = Math.cos(angle) * 80;
+            const y = Math.sin(angle) * 80;
+            return `<ellipse cx="${x}" cy="${y}" rx="70" ry="40" fill="url(#gold)" opacity="0.8" transform="rotate(${i * 45} ${x} ${y})"/>`;
+          }).join('')}
+          <circle cx="0" cy="0" r="60" fill="${randomColor3}" opacity="0.9"/>
+          <circle cx="0" cy="0" r="35" fill="#FFF9C4"/>
+          ${Array.from({length: 12}, (_, i) => {
+            const angle = (i * 30) * Math.PI / 180;
+            return `<circle cx="${Math.cos(angle) * 20}" cy="${Math.sin(angle) * 20}" r="3" fill="#FFD54F"/>`;
+          }).join('')}
+        </g>
+      ` : isKrishna ? `
+        <!-- Krishna Flute -->
+        <g transform="translate(512, 512)" filter="url(#glow)">
+          <text x="0" y="0" font-size="280" font-family="serif" fill="url(#gold)" text-anchor="middle" dominant-baseline="middle" font-weight="bold">ॐ</text>
+          <circle cx="-100" cy="-100" r="40" fill="${randomColor3}" opacity="0.7"/>
+          <circle cx="100" cy="-100" r="40" fill="${randomColor3}" opacity="0.7"/>
+          <circle cx="-100" cy="100" r="40" fill="${randomColor3}" opacity="0.7"/>
+          <circle cx="100" cy="100" r="40" fill="${randomColor3}" opacity="0.7"/>
+        </g>
+      ` : `
+        <!-- Om Symbol -->
+        <g transform="translate(512, 512)" filter="url(#glow)">
+          <text x="0" y="0" font-size="260" font-family="serif" fill="url(#gold)" text-anchor="middle" dominant-baseline="middle" font-weight="bold">ॐ</text>
+          ${Array.from({length: 6}, (_, i) => {
+            const angle = (i * 60) * Math.PI / 180;
+            return `<circle cx="${Math.cos(angle) * 180}" cy="${Math.sin(angle) * 180}" r="30" fill="${randomColor3}" opacity="0.6"/>`;
+          }).join('')}
+        </g>
+      `}
+      
+      <!-- Decorative corners -->
+      <g opacity="0.5">
+        <circle cx="100" cy="100" r="50" fill="#FFF3E0"/>
+        <circle cx="924" cy="100" r="50" fill="#FFF3E0"/>
+        <circle cx="100" cy="924" r="50" fill="#FFF3E0"/>
+        <circle cx="924" cy="924" r="50" fill="#FFF3E0"/>
+      </g>
+      
+      <!-- Light rays -->
+      <g opacity="0.3" stroke="#FFF9C4" stroke-width="3">
+        <line x1="512" y1="0" x2="512" y2="1024"/>
+        <line x1="0" y1="512" x2="1024" y2="512"/>
+        <line x1="100" y1="100" x2="924" y2="924"/>
+        <line x1="924" y1="100" x2="100" y2="924"/>
+      </g>
+      
+      <!-- Info Banner -->
+      <g>
+        <rect x="112" y="900" width="800" height="80" rx="10" fill="#000000" opacity="0.7"/>
+        <text x="512" y="935" font-size="20" font-family="sans-serif" fill="#FFD700" text-anchor="middle" font-weight="bold">⚠️ Placeholder Art - Set up HF API for AI Generation</text>
+        <text x="512" y="965" font-size="16" font-family="sans-serif" fill="#FFFFFF" text-anchor="middle">${prompt.substring(0, 60)}${prompt.length > 60 ? '...' : ''}</text>
+      </g>
+    </svg>
+  `;
+  
+  // Convert SVG to base64 data URL
+  const base64 = btoa(encodeURIComponent(svg).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+    return String.fromCharCode(parseInt(p1, 16));
+  }));
+  return `data:image/svg+xml;base64,${base64}`;
 };
 
 /* --- COMPONENTS --- */
@@ -603,9 +764,12 @@ export default function App() {
       const isImageGen = text.toLowerCase().match(/^(generate|create|draw|make) (an )?image/);
 
       if (isImageGen) {
-        aiResponseText = "I have manifested this vision for you.";
         generatedImageUrl = await callImagenAPI(text);
-        if (!generatedImageUrl) aiResponseText = "Creative energies blocked. Please try again.";
+        if (generatedImageUrl) {
+          aiResponseText = "I have manifested this vision for you. 🎨✨";
+        } else {
+          aiResponseText = "🔧 **Image Generation Setup Required**\n\nTo enable AI image generation, please:\n\n1. Get a free Hugging Face API token from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)\n2. Add it to your `.env` file:\n   ```\n   REACT_APP_HF_API_TOKEN=your_token_here\n   ```\n3. Restart the development server\n\n*Note: Google's Imagen API is not available through the standard Gemini API. We use Stable Diffusion via Hugging Face as an alternative.*";
+        }
       } else {
         const bestVerse = findBestVerse(text);
         aiResponseText = await callGeminiAPI(currentHistory, text, fileToUpload, bestVerse);

@@ -1,4 +1,73 @@
-# Getting Started with Create React App
+# Shankhnaad AI - Spiritual Guidance Platform
+
+A spiritual AI chatbot powered by Google's Gemini AI, offering wisdom from the Bhagavad Gita and AI image generation capabilities.
+
+## Features
+
+- 💬 **AI Chat**: Powered by Gemini 2.5 Flash for spiritual guidance
+- 🎨 **AI Image Generation**: Create spiritual artwork using Stable Diffusion
+- 📖 **Scripture Integration**: Local RAG with Bhagavad Gita verses
+- 🎙️ **Voice Input**: Speech-to-text for hands-free interaction
+- 🔊 **Text-to-Speech**: Listen to AI responses
+- 📱 **Responsive Design**: Works on desktop and mobile
+
+## Quick Start
+
+### Prerequisites
+- Node.js 20.x or higher
+- npm or yarn
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/Sharmamayankkkk/Shankhnaad.git
+   cd Shankhnaad
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Set up environment variables:
+   ```bash
+   # Copy .env file and add your API keys
+   # REACT_APP_GEMINI_API_KEY is required for chat
+   # REACT_APP_HF_API_TOKEN is required for image generation
+   ```
+
+4. Start the development server:
+   ```bash
+   npm start
+   ```
+
+5. Open [http://localhost:3000](http://localhost:3000)
+
+## 🎨 Image Generation Setup
+
+**Important**: Google's Imagen API is not available through the standard Gemini API. We use Hugging Face's Stable Diffusion as an alternative.
+
+For detailed setup instructions, see: **[IMAGE_GENERATION_SETUP.md](./IMAGE_GENERATION_SETUP.md)**
+
+Quick setup:
+1. Get a free token from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+2. Add to `.env`: `REACT_APP_HF_API_TOKEN=your_token_here`
+3. Restart the dev server
+
+## Environment Variables
+
+Create a `.env` file in the root directory:
+
+```env
+# Required for AI chat functionality
+REACT_APP_GEMINI_API_KEY=your_gemini_api_key
+
+# Required for image generation (see IMAGE_GENERATION_SETUP.md)
+REACT_APP_HF_API_TOKEN=your_huggingface_token
+```
+
+## Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
