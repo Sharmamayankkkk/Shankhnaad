@@ -17,6 +17,10 @@ import gitaDataRaw from './data/gita_data.json';
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY || ""; 
 const SPIRITUAL_ART_PROMPT_PREFIX = "Spiritual divine art style, Krishna Consciousness Society aesthetic, high quality, detailed: ";
 
+// Image generation messages
+const IMAGE_GEN_SUCCESS_MSG = "I have manifested this divine vision for you using Stable Diffusion. 🎨✨";
+const IMAGE_GEN_FALLBACK_MSG = "🎨 **Placeholder Artwork Generated**\n\nStable Diffusion service is currently unavailable. Showing artistic placeholder instead.\n\n💡 The app uses Pollinations.ai for free Stable Diffusion image generation. Please try again in a moment.";
+
 /* --- 1. LOCAL DATA & SEARCH ENGINE (RAG) --- */
 const getVerses = () => {
   if (Array.isArray(gitaDataRaw)) return gitaDataRaw;
@@ -154,7 +158,7 @@ const callStableDiffusionAPI = async (prompt) => {
     return imageUrl;
     
   } catch (error) {
-    console.error("❌ Stable Diffusion generation error:", error.message);
+    console.error("❌ Stable Diffusion generation error:", error?.message || error);
     return null;
   }
 };
@@ -726,11 +730,11 @@ export default function App() {
       if (isImageGen) {
         generatedImageUrl = await callStableDiffusionAPI(text);
         if (generatedImageUrl) {
-          aiResponseText = "I have manifested this divine vision for you using Stable Diffusion. 🎨✨";
+          aiResponseText = IMAGE_GEN_SUCCESS_MSG;
         } else {
           // Fallback to placeholder art
           generatedImageUrl = generatePlaceholderArt(text);
-          aiResponseText = "🎨 **Placeholder Artwork Generated**\n\nStable Diffusion service is currently unavailable. Showing artistic placeholder instead.\n\n💡 The app uses Pollinations.ai for free Stable Diffusion image generation. Please try again in a moment.";
+          aiResponseText = IMAGE_GEN_FALLBACK_MSG;
         }
       } else {
         const bestVerse = findBestVerse(text);
