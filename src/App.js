@@ -1052,7 +1052,49 @@ export default function App() {
                     }}
                   />
                 ))}
-                {isTyping && <div className="flex gap-4 ml-2"><img src="/logo.png" alt="Shankhnaad Logo" className="w-8 h-8 opacity-50 animate-pulse rounded-full"/><span className="text-gray-500 text-sm mt-2 flex items-center gap-2">Consulting scriptures <Loader2 size={12} className="animate-spin"/></span></div>}
+                {isTyping && (
+                  <div className="flex gap-4 ml-2 animate-fade-in">
+                    <div className="flex flex-col items-center">
+                      {/* Gemini-style loading animation */}
+                      <div className="relative w-12 h-12 flex items-center justify-center">
+                        {/* Try to load video first, fallback to animated circles */}
+                        <video 
+                          autoPlay 
+                          loop 
+                          muted 
+                          playsInline
+                          className="w-12 h-12 rounded-full object-cover"
+                          onError={(e) => {
+                            // Hide video if it fails to load
+                            e.target.style.display = 'none';
+                            // Show fallback animation
+                            e.target.nextElementSibling.style.display = 'block';
+                          }}
+                        >
+                          <source src="/loading.mp4" type="video/mp4" />
+                        </video>
+                        {/* Fallback animated circles (Gemini-style) */}
+                        <div className="absolute inset-0 flex items-center justify-center" style={{display: 'none'}}>
+                          <div className="relative w-12 h-12">
+                            <div className="absolute inset-0 rounded-full border-2 border-blue-500/30"></div>
+                            <div className="absolute inset-0 rounded-full border-2 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
+                            <div className="absolute inset-2 rounded-full border-2 border-purple-500/30"></div>
+                            <div className="absolute inset-2 rounded-full border-2 border-t-transparent border-r-purple-500 border-b-transparent border-l-transparent animate-spin" style={{animationDuration: '1.5s', animationDirection: 'reverse'}}></div>
+                            <div className="absolute inset-4 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 opacity-50 animate-pulse"></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1 mt-1">
+                      <span className="text-gray-400 text-sm font-medium">Shankhnaad is thinking...</span>
+                      <div className="flex gap-1">
+                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                        <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                        <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               
               <div className="p-4 bg-[#131314]">

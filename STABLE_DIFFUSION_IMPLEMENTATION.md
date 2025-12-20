@@ -1,20 +1,39 @@
 # Stable Diffusion Implementation
 
 ## Overview
-This document describes the Stable Diffusion image generation implementation in the Shankhnaad AI app.
+This document describes the advanced Stable Diffusion image generation implementation in the Shankhnaad AI app with Gemini AI prompt enhancement, intelligent detection, and responsive UI.
 
 ## Implementation Details
 
+### Function: `enhancePromptWithGemini`
+Located in: `src/App.js` (lines ~140-185)
+
+**Purpose**: Optimizes user prompts before image generation for superior results
+
+**Process**:
+1. Takes user's basic prompt
+2. Sends to Gemini AI with enhancement instructions
+3. Gemini adds artistic details, quality tags, composition guidance
+4. Returns optimized prompt (under 150 words)
+5. Falls back to original if enhancement fails
+
+**Example**:
+- Input: "sunset"
+- Output: "Breathtaking golden sunset over ocean, dramatic clouds with orange and pink hues, professional landscape photography, high quality, detailed, 8k resolution, atmospheric lighting"
+
 ### Function: `callStableDiffusionAPI`
-Located in: `src/App.js` (lines ~127-150)
+Located in: `src/App.js` (lines ~187-235)
 
 ### How It Works
-1. **User Input**: User types a prompt like "Generate image of Krishna"
-2. **Prompt Enhancement**: The system adds a spiritual art style prefix:
-   ```
-   "Spiritual divine art style, Krishna Consciousness Society aesthetic, high quality, detailed: [user's prompt]"
-   ```
-3. **URL Generation**: Creates a Pollinations.ai URL with parameters:
+1. **Content Filtering**: Blocks explicit keywords
+2. **Prompt Enhancement**: Gemini AI optimizes the prompt
+3. **URL Generation**: Creates Pollinations.ai URL with enhanced prompt
+4. **Image Fetching**: Downloads image and converts to blob
+5. **Privacy**: Returns blob URL (hides service endpoint)
+6. **Cleanup**: Stores blob reference for memory management
+
+### Intelligent Detection
+Located in: `src/App.js` (lines ~885-905)
    - Prompt (URL encoded)
    - Width: 1024px
    - Height: 1024px  
