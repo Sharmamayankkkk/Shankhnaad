@@ -17,6 +17,7 @@ import gitaDataRaw from './data/gita_data.json';
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY || "";
 const OPENROUTER_API_KEY = process.env.REACT_APP_OPENROUTER_API_KEY || "";
 const OPENROUTER_MODEL = "meta-llama/llama-3.1-405b-instruct:free";
+const MEDIA_FALLBACK_NOTE = "\n\n[Note: A media file was attached but couldn't be processed]";
 
 // Image generation messages
 const IMAGE_GEN_SUCCESS_MSG = "I have manifested this divine vision for you using Stable Diffusion. 🎨✨";
@@ -29,6 +30,14 @@ const EXPLICIT_KEYWORDS = ['nude', 'naked', 'nsfw', 'explicit', 'porn', 'sex', '
 const containsExplicitContent = (text) => {
   const lowerText = text.toLowerCase();
   return EXPLICIT_KEYWORDS.some(keyword => lowerText.includes(keyword));
+};
+
+// Helper function to detect rate limit errors from API responses
+const isRateLimitError = (response) => {
+  if (!response || typeof response !== 'string') return false;
+  return response.includes("Rate limit exceeded") || 
+         response.includes("rate limit") || 
+         response.includes("429");
 };
 
 // Helper function to generate system instruction with optional verse context
@@ -331,19 +340,19 @@ const callAIAPI = async (history, currentPrompt, mediaFile, contextVerse) => {
     if (GEMINI_API_KEY) {
       try {
         const response = await callGeminiAPI(history, currentPrompt, mediaFile, contextVerse);
-        // Check if the response is a rate limit error message
-        if (response && response.includes("Rate limit exceeded")) {
+        // Check if the response is a rate limit error
+        if (isRateLimitError(response)) {
           console.warn("⚠️ [AI API] Gemini rate limited for media, falling back to OpenRouter without media");
           // Fallback to OpenRouter without media file
           if (OPENROUTER_API_KEY) {
-            return await callOpenRouterAPI(history, currentPrompt + "\n\n[Note: A media file was attached but couldn't be processed]", null, contextVerse);
+            return await callOpenRouterAPI(history, currentPrompt + MEDIA_FALLBACK_NOTE, null, contextVerse);
           }
         }
         return response;
       } catch (error) {
         console.warn("⚠️ [AI API] Gemini failed for media, trying OpenRouter without media:", error.message);
         if (OPENROUTER_API_KEY) {
-          return await callOpenRouterAPI(history, currentPrompt + "\n\n[Note: A media file was attached but couldn't be processed]", null, contextVerse);
+          return await callOpenRouterAPI(history, currentPrompt + MEDIA_FALLBACK_NOTE, null, contextVerse);
         }
         throw error;
       }
@@ -375,7 +384,7 @@ const callAIAPI = async (history, currentPrompt, mediaFile, contextVerse) => {
     const response = await callGeminiAPI(history, currentPrompt, mediaFile, contextVerse);
     
     // If Gemini also has rate limits and OpenRouter is available, try OpenRouter as last resort
-    if (response && response.includes("Rate limit exceeded") && OPENROUTER_API_KEY) {
+    if (isRateLimitError(response) && OPENROUTER_API_KEY) {
       console.warn("⚠️ [AI API] Gemini rate limited, trying OpenRouter as last resort...");
       try {
         return await callOpenRouterAPI(history, currentPrompt, null, contextVerse);
