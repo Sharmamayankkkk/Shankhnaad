@@ -17,7 +17,7 @@ import gitaDataRaw from './data/gita_data.json';
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY || "";
 const OPENROUTER_API_KEY = process.env.REACT_APP_OPENROUTER_API_KEY || "";
 const OPENROUTER_MODEL = "meta-llama/llama-3.1-405b-instruct:free";
-const MEDIA_FALLBACK_NOTE = "\n\n[Note: A media file was attached but couldn't be processed]";
+const MEDIA_FALLBACK_NOTE = "\n\n[Note: A media file was attached but couldn't be processed. The Llama 3.1 405B model doesn't support image analysis. For image analysis, Gemini needs to be available (currently rate limited). Please try again in a few moments, or describe the image instead.]";
 
 // Image generation messages
 const IMAGE_GEN_SUCCESS_MSG = "I have manifested this divine vision for you using Stable Diffusion. 🎨✨";
