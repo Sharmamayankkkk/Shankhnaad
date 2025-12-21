@@ -17,7 +17,7 @@ import gitaDataRaw from './data/gita_data.json';
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY || "";
 const OPENROUTER_API_KEY = process.env.REACT_APP_OPENROUTER_API_KEY || "";
 const OPENROUTER_MODEL = "meta-llama/llama-3.1-405b-instruct:free";
-const MEDIA_FALLBACK_NOTE = "\n\n[Note: A media file was attached but couldn't be processed. The Llama 3.1 405B model doesn't support image analysis. For image analysis, Gemini needs to be available (currently rate limited). Please try again in a few moments, or describe the image instead.]";
+const MEDIA_FALLBACK_NOTE = "\n\n[Note: A media file was attached but couldn't be processed. The Llama 3.1 405B model doesn't support image analysis. For image analysis, please use Gemini or describe the image in text.]";
 
 // Image generation messages
 const IMAGE_GEN_SUCCESS_MSG = "I have manifested this divine vision for you using Stable Diffusion. 🎨✨";
@@ -343,9 +343,10 @@ const callAIAPI = async (history, currentPrompt, mediaFile, contextVerse) => {
         // Check if the response is a rate limit error
         if (isRateLimitError(response)) {
           console.warn("⚠️ [AI API] Gemini rate limited for media, falling back to OpenRouter without media");
-          // Fallback to OpenRouter without media file
+          // Fallback to OpenRouter without media file with specific rate limit message
           if (OPENROUTER_API_KEY) {
-            return await callOpenRouterAPI(history, currentPrompt + MEDIA_FALLBACK_NOTE, null, contextVerse);
+            const rateLimitNote = "\n\n[Note: A media file was attached but couldn't be processed. Gemini (which supports image analysis) is currently rate limited. The Llama 3.1 405B model doesn't support images. Please try again in a few moments, or describe the image in text.]";
+            return await callOpenRouterAPI(history, currentPrompt + rateLimitNote, null, contextVerse);
           }
         }
         return response;
