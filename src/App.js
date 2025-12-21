@@ -265,7 +265,7 @@ const callOpenRouterAPI = async (history, currentPrompt, mediaFile, contextVerse
 
   console.log("📤 [OpenRouter API] Sending request:", {
     endpoint: 'openrouter.ai',
-    model: 'meta-llama/llama-4-maverick',
+    model: 'meta-llama/llama-3.1-405b-instruct:free',
     messagesCount: messages.length,
     timestamp: new Date().toISOString()
   });
@@ -280,7 +280,7 @@ const callOpenRouterAPI = async (history, currentPrompt, mediaFile, contextVerse
         'X-Title': 'Shankhnaad AI'
       },
       body: JSON.stringify({
-        model: 'meta-llama/llama-4-maverick',
+        model: 'meta-llama/llama-3.1-405b-instruct:free',
         messages: messages
       })
     });
@@ -409,7 +409,7 @@ Enhanced prompt:`;
             'X-Title': 'Shankhnaad AI'
           },
           body: JSON.stringify({
-            model: 'meta-llama/llama-4-maverick',
+            model: 'meta-llama/llama-3.1-405b-instruct:free',
             messages: [
               { role: 'user', content: enhancementInstruction }
             ],
