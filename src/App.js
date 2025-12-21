@@ -471,9 +471,9 @@ const callLocalModelAPI = async (history, currentPrompt, contextVerse) => {
     // Format the prompt for the local model
     const formattedPrompt = formatChatPrompt(history, currentPrompt, systemInstruction);
     
-    // Generate response using local model
+    // Generate response using local model with conservative settings
     const response = await generateLocalText(formattedPrompt, {
-      max_new_tokens: 400,
+      max_new_tokens: 200,  // Reduced from 400 to prevent crashes
       temperature: 0.7
     });
     
@@ -1027,6 +1027,12 @@ const SettingsModal = ({ isOpen, onClose, addToast, useLocalModel, setUseLocalMo
                  {!hasCloudAPI && (
                    <p className="text-yellow-400 mt-2">⚠️ No cloud API keys configured. Local model will be used automatically.</p>
                  )}
+                 <div className="bg-yellow-900/20 border border-yellow-700/50 rounded p-2 mt-2">
+                   <p className="text-yellow-400 font-semibold text-[11px]">⚠️ System Requirements:</p>
+                   <p className="text-yellow-300 mt-1 text-[10px]">• Minimum 2GB RAM available</p>
+                   <p className="text-yellow-300 text-[10px]">• Close other tabs before enabling</p>
+                   <p className="text-yellow-300 text-[10px]">• May cause slowdown on low-end devices</p>
+                 </div>
                </div>
              </div>
            )}
@@ -1361,6 +1367,22 @@ export default function App() {
     if (localModelInitializing) {
       console.log('⏳ [Local Model] Already initializing...');
       return;
+    }
+
+    // Check memory before initializing
+    if (performance.memory) {
+      const availableMemoryMB = (performance.memory.jsHeapSizeLimit - performance.memory.usedJSHeapSize) / (1024 * 1024);
+      console.log(`💾 [Memory Check] Available: ${Math.round(availableMemoryMB)}MB`);
+      
+      if (availableMemoryMB < 800) {
+        addToast(`Insufficient memory: ${Math.round(availableMemoryMB)}MB available. Need at least 800MB. Close some tabs and try again.`, 'error');
+        setLocalModelStatus({
+          ready: false,
+          loading: false,
+          error: `Insufficient memory (${Math.round(availableMemoryMB)}MB). Close some tabs.`
+        });
+        return;
+      }
     }
 
     setLocalModelInitializing(true);

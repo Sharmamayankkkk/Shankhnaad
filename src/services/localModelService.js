@@ -76,6 +76,22 @@ export const initializeLocalModel = async (modelId = DEFAULT_MODEL.id, progressC
   }
 
   try {
+    // Check device capability before loading
+    const compatibility = checkBrowserCompatibility();
+    if (!compatibility.supported) {
+      throw new Error('Browser not compatible with local models');
+    }
+
+    // Check available memory - need at least 1GB free for TinyLLama
+    if (performance.memory) {
+      const availableMemoryMB = (performance.memory.jsHeapSizeLimit - performance.memory.usedJSHeapSize) / (1024 * 1024);
+      console.log(`💾 [Local Model] Available memory: ${Math.round(availableMemoryMB)}MB`);
+      
+      if (availableMemoryMB < 800) {
+        throw new Error(`Insufficient memory: ${Math.round(availableMemoryMB)}MB available, need at least 800MB. Close some tabs and try again.`);
+      }
+    }
+
     isModelLoading = true;
     modelLoadError = null;
 
@@ -85,7 +101,7 @@ export const initializeLocalModel = async (modelId = DEFAULT_MODEL.id, progressC
       progressCallback({ status: 'loading', message: 'Loading local model...' });
     }
 
-    // Create text generation pipeline
+    // Create text generation pipeline with memory-efficient settings
     textGenerationPipeline = await pipeline('text-generation', modelId, {
       progress_callback: (progress) => {
         console.log('📦 [Local Model] Download progress:', progress);
@@ -99,7 +115,10 @@ export const initializeLocalModel = async (modelId = DEFAULT_MODEL.id, progressC
             progress: percent
           });
         }
-      }
+      },
+      // Optimize for memory efficiency
+      quantized: true,
+      revision: 'default'
     });
 
     console.log('✅ [Local Model] Initialized successfully!');
@@ -151,11 +170,12 @@ export const generateLocalText = async (prompt, options = {}) => {
     console.log('🤖 [Local Model] Generating response...');
     console.log('📝 [Local Model] Prompt:', prompt.substring(0, 100) + '...');
 
+    // Conservative defaults to prevent crashes on low-end devices
     const defaultOptions = {
-      max_new_tokens: 512,
+      max_new_tokens: 256,  // Reduced from 512 to prevent memory issues
       temperature: 0.7,
-      top_k: 50,
-      top_p: 0.95,
+      top_k: 40,            // Reduced from 50 for efficiency
+      top_p: 0.9,           // Reduced from 0.95 for efficiency
       repetition_penalty: 1.1,
       do_sample: true,
       ...options

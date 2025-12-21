@@ -19,7 +19,18 @@ Shankhnaad now supports **running AI models locally in your browser** using Tran
 - ⚠️ **Slower Inference** - Browser-based inference is slower than cloud APIs
 - ⚠️ **Quality** - Smaller models (1-2B parameters) vs cloud models (405B parameters)
 - ⚠️ **Browser Requirements** - Requires modern browser with WebAssembly support
+- ⚠️ **Memory Requirements** - Needs at least 1GB free RAM, 2GB recommended
 - ⚠️ **No Multimodal** - Currently text-only (no image/audio/video analysis)
+
+## ⚠️ Important: System Requirements
+
+**Before Enabling Local Models:**
+- **Minimum 2GB RAM** on your device
+- **At least 1GB free RAM** available (close other tabs/apps)
+- Modern browser with WebAssembly support
+- Stable internet connection for initial download
+
+**Warning:** Local models can cause slowdowns or crashes on low-end devices. If you experience issues, use the cloud API instead.
 
 ## 🚀 Quick Start
 
@@ -58,8 +69,12 @@ Shankhnaad now supports **running AI models locally in your browser** using Tran
 - WebGPU (optional, for acceleration)
 
 **Memory Requirements:**
-- Minimum: 2GB RAM
-- Recommended: 4GB+ RAM for smooth operation
+- **Minimum: 2GB total RAM** on device
+- **At least 1GB free RAM** before initializing
+- **Recommended: 4GB+ RAM** for smooth operation
+- **Close other tabs/applications** before enabling local models
+
+**⚠️ Warning:** The app checks available memory before initialization. If insufficient memory is detected (<800MB free), initialization will be blocked to prevent crashes.
 
 ### Check Compatibility
 
@@ -174,11 +189,20 @@ Use Local Model ←───────────────┘
 
 ### Troubleshooting
 
+**Browser/Device Crashes:**
+- **Close ALL other tabs** before initializing
+- Check available RAM - need at least 1GB free
+- Try on a device with more RAM (2GB minimum total)
+- Use cloud API instead if device is low-end
+- Clear browser cache and restart browser
+- The app now checks memory before loading and will block if insufficient
+
 **Model won't load:**
 - Clear browser cache and try again
 - Check available disk space (need ~1GB free)
 - Try different browser
 - Disable aggressive ad blockers
+- Check console for "Insufficient memory" errors
 
 **Model is slow:**
 - Close unused browser tabs
@@ -187,10 +211,10 @@ Use Local Model ←───────────────┘
 - Consider using cloud API for better speed
 
 **Out of memory errors:**
-- Close other tabs and applications
-- Restart browser
-- Use smaller model
-- Consider cloud API for limited memory devices
+- **Most common issue** - close other tabs and applications
+- Restart browser to free up memory
+- Use cloud API instead
+- Avoid using local models on devices with <2GB RAM
 
 ## 🔐 Privacy & Security
 
