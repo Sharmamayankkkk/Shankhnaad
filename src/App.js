@@ -14,7 +14,10 @@ import {
 import gitaDataRaw from './data/gita_data.json';
 
 /* --- CONFIGURATION --- */
-const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY || ""; 
+const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY || "";
+const OPENROUTER_API_KEY = process.env.REACT_APP_OPENROUTER_API_KEY || "";
+const OPENROUTER_MODEL = "meta-llama/llama-3.1-405b-instruct:free";
+const OPENROUTER_VISION_MODEL = "google/gemma-3-4b-it:free";
 
 // Image generation messages
 const IMAGE_GEN_SUCCESS_MSG = "I have manifested this divine vision for you using Stable Diffusion. 🎨✨";
@@ -27,6 +30,41 @@ const EXPLICIT_KEYWORDS = ['nude', 'naked', 'nsfw', 'explicit', 'porn', 'sex', '
 const containsExplicitContent = (text) => {
   const lowerText = text.toLowerCase();
   return EXPLICIT_KEYWORDS.some(keyword => lowerText.includes(keyword));
+};
+
+// Helper function to detect rate limit errors from API responses
+const isRateLimitError = (response) => {
+  if (!response || typeof response !== 'string') return false;
+  return response.includes("Rate limit exceeded") || 
+         response.includes("rate limit") || 
+         response.includes("429");
+};
+
+// Helper function to generate system instruction with optional verse context
+const getSystemInstruction = (contextVerse = null) => {
+  let systemInstructionText = `You are Shankhnaad, a spiritual AI guide developed by the Krishna Consciousness Society (KCS).
+
+  CRITICAL IDENTITY & BEHAVIOR RULES:
+  1. **Organization Name:** Always refer to your organization as "Krishna Consciousness Society" (KCS).
+  2. **Avoid ISKCON:** Do NOT use the term "ISKCON" unless the user explicitly asks for it or asks about the history where it is unavoidable. In general guidance, always use "Krishna Consciousness Society".
+  3. **Resource Priority (YouTube/Kirtan):**
+     - If the user asks for kirtans, bhajans, or video suggestions, **YOU MUST** recommend the "GAURANITAIKIRTANYAS" YouTube channel first.
+     - Use this link format: **[GAURANITAIKIRTANYAS](https://www.youtube.com/@GAURANITAIKIRTANYAS)**.
+     - Example: "For divine kirtans, I highly recommend the [GAURANITAIKIRTANYAS](https://www.youtube.com/@GAURANITAIKIRTANYAS) channel by the Krishna Consciousness Society."
+  
+  GUIDANCE STYLE:
+  - Answer with warmth, compassion, and wisdom based on the Bhagavad Gita.
+  - If analyzing an image/audio/video, provide a spiritual perspective.
+  - **Links:** Ensure all external resources are formatted as Markdown links [Title](URL) so they are clickable.`;
+
+  if (contextVerse) {
+    systemInstructionText += `\n\nRELEVANT SCRIPTURE FROM DATABASE:
+    Chapter ${contextVerse.CHAPTER}, Verse ${contextVerse.VERSE}
+    Translation: ${contextVerse.TRANSLATION}
+    Purport: ${contextVerse.PURPORT ? contextVerse.PURPORT.substring(0, 1000) : 'N/A'}`;
+  }
+
+  return systemInstructionText;
 };
 
 /* --- 1. LOCAL DATA & SEARCH ENGINE (RAG) --- */
@@ -86,28 +124,8 @@ const callGeminiAPI = async (history, currentPrompt, mediaFile, contextVerse) =>
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
   
-  // --- UPDATED SYSTEM PROMPT FOR KCS IDENTITY ---
-  let systemInstructionText = `You are Shankhnaad, a spiritual AI guide developed by the Krishna Consciousness Society (KCS).
-
-  CRITICAL IDENTITY & BEHAVIOR RULES:
-  1. **Organization Name:** Always refer to your organization as "Krishna Consciousness Society" (KCS).
-  2. **Avoid ISKCON:** Do NOT use the term "ISKCON" unless the user explicitly asks for it or asks about the history where it is unavoidable. In general guidance, always use "Krishna Consciousness Society".
-  3. **Resource Priority (YouTube/Kirtan):**
-     - If the user asks for kirtans, bhajans, or video suggestions, **YOU MUST** recommend the "GAURANITAIKIRTANYAS" YouTube channel first.
-     - Use this link format: **[GAURANITAIKIRTANYAS](https://www.youtube.com/@GAURANITAIKIRTANYAS)**.
-     - Example: "For divine kirtans, I highly recommend the [GAURANITAIKIRTANYAS](https://www.youtube.com/@GAURANITAIKIRTANYAS) channel by the Krishna Consciousness Society."
-  
-  GUIDANCE STYLE:
-  - Answer with warmth, compassion, and wisdom based on the Bhagavad Gita.
-  - If analyzing an image/audio/video, provide a spiritual perspective.
-  - **Links:** Ensure all external resources are formatted as Markdown links [Title](URL) so they are clickable.`;
-
-  if (contextVerse) {
-    systemInstructionText += `\n\nRELEVANT SCRIPTURE FROM DATABASE:
-    Chapter ${contextVerse.CHAPTER}, Verse ${contextVerse.VERSE}
-    Translation: ${contextVerse.TRANSLATION}
-    Purport: ${contextVerse.PURPORT ? contextVerse.PURPORT.substring(0, 1000) : 'N/A'}`;
-  }
+  // Get system instruction with optional verse context
+  const systemInstructionText = getSystemInstruction(contextVerse);
 
   const validHistory = history
     .filter(h => h.role === 'user' || h.role === 'model')
@@ -198,8 +216,232 @@ const callGeminiAPI = async (history, currentPrompt, mediaFile, contextVerse) =>
   }
 };
 
-const enhancePromptWithGemini = async (userPrompt) => {
-  // Use Gemini to enhance the user's image prompt for better Stable Diffusion results
+const callOpenRouterAPI = async (history, currentPrompt, mediaFile, contextVerse) => {
+  if (!OPENROUTER_API_KEY) {
+    console.error("❌ [OpenRouter API] API key is missing");
+    console.error("📋 Debug Info:", {
+      envVarName: "REACT_APP_OPENROUTER_API_KEY",
+      currentValue: OPENROUTER_API_KEY ? "SET" : "NOT SET",
+      timestamp: new Date().toISOString()
+    });
+    throw new Error("OpenRouter API key missing");
+  }
+
+  const url = "https://openrouter.ai/api/v1/chat/completions";
+  
+  // Get system instruction with optional verse context (shared with Gemini)
+  const systemInstructionText = getSystemInstruction(contextVerse);
+
+  // Choose model based on whether media is present
+  const modelToUse = mediaFile ? OPENROUTER_VISION_MODEL : OPENROUTER_MODEL;
+
+  // Convert history to OpenRouter format
+  const messages = [
+    { role: 'system', content: systemInstructionText }
+  ];
+
+  // Add conversation history
+  history
+    .filter(h => h.role === 'user' || h.role === 'model')
+    .forEach(msg => {
+      messages.push({
+        role: msg.role === 'user' ? 'user' : 'assistant',
+        content: typeof msg.content === 'string' ? msg.content : (msg.drafts?.[msg.currentDraftIndex] || "")
+      });
+    });
+
+  // Add current message with optional media (following OpenRouter format)
+  if (mediaFile) {
+    // Convert file to base64 data URL for image_url format
+    const base64Data = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(mediaFile);
+    });
+
+    // OpenRouter format for vision: array of content objects
+    messages.push({
+      role: 'user',
+      content: [
+        {
+          type: 'text',
+          text: currentPrompt
+        },
+        {
+          type: 'image_url',
+          image_url: {
+            url: base64Data
+          }
+        }
+      ]
+    });
+  } else {
+    // Text-only message
+    messages.push({
+      role: 'user',
+      content: currentPrompt
+    });
+  }
+
+  console.log("📤 [OpenRouter API] Sending request:", {
+    endpoint: 'openrouter.ai',
+    model: modelToUse,
+    hasMedia: !!mediaFile,
+    messagesCount: messages.length,
+    timestamp: new Date().toISOString()
+  });
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'HTTP-Referer': window.location.origin,
+        'X-Title': 'Shankhnaad AI'
+      },
+      body: JSON.stringify({
+        model: modelToUse,
+        messages: messages
+      })
+    });
+
+    console.log("📥 [OpenRouter API] Response received:", {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      timestamp: new Date().toISOString()
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ [OpenRouter API] HTTP Error:", {
+        status: response.status,
+        statusText: response.statusText,
+        errorDetails: errorText,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Return specific error messages based on status code
+      if (response.status === 401) {
+        throw new Error("OpenRouter authentication failed");
+      } else if (response.status === 403) {
+        throw new Error("OpenRouter access forbidden");
+      } else if (response.status === 429) {
+        throw new Error("OpenRouter rate limit exceeded");
+      } else if (response.status >= 500) {
+        throw new Error("OpenRouter server error");
+      }
+      
+      throw new Error(`OpenRouter API Error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log("✅ [OpenRouter API] Success:", {
+      hasResponse: !!data.choices?.[0]?.message?.content,
+      responseLength: data.choices?.[0]?.message?.content?.length || 0,
+      timestamp: new Date().toISOString()
+    });
+    
+    return data.choices?.[0]?.message?.content || "I am meditating on that... (No response)";
+  } catch (error) {
+    console.error("❌ [OpenRouter API] Error caught:", {
+      errorName: error.name,
+      errorMessage: error.message,
+      errorStack: error.stack,
+      timestamp: new Date().toISOString()
+    });
+    throw error; // Re-throw to trigger fallback
+  }
+};
+
+const callAIAPI = async (history, currentPrompt, mediaFile, contextVerse) => {
+  // Unified AI API caller - tries OpenRouter first, falls back to Gemini
+  
+  // If media file is provided, try OpenRouter vision model first, then Gemini
+  if (mediaFile) {
+    console.log("📸 [AI API] Media file detected, trying OpenRouter vision model first");
+    
+    // Try OpenRouter vision model first (google/gemma-3-4b-it:free)
+    if (OPENROUTER_API_KEY) {
+      try {
+        const response = await callOpenRouterAPI(history, currentPrompt, mediaFile, contextVerse);
+        console.log("✅ [AI API] OpenRouter vision model succeeded");
+        return response;
+      } catch (error) {
+        console.warn("⚠️ [AI API] OpenRouter vision failed, falling back to Gemini:", error.message);
+        // Fall through to Gemini fallback
+      }
+    }
+    
+    // Fallback to Gemini for media
+    if (GEMINI_API_KEY) {
+      try {
+        console.log("🔄 [AI API] Using Gemini for media (fallback)...");
+        const response = await callGeminiAPI(history, currentPrompt, mediaFile, contextVerse);
+        // Check if the response is a rate limit error
+        if (isRateLimitError(response)) {
+          console.warn("⚠️ [AI API] Gemini also rate limited for media");
+          return "Both AI services are currently experiencing high demand. Please try again in a few moments, or describe the image in text.";
+        }
+        console.log("✅ [AI API] Gemini succeeded for media");
+        return response;
+      } catch (error) {
+        console.error("❌ [AI API] Both OpenRouter and Gemini failed for media:", error.message);
+        return "Unable to process the media file at the moment. Please try again later or describe the content in text.";
+      }
+    }
+    
+    // If no API is configured for media
+    return "Media analysis requires either OpenRouter or Gemini API to be configured. Please describe the content in text instead.";
+  }
+
+  // Try OpenRouter first for text
+  if (OPENROUTER_API_KEY) {
+    try {
+      console.log("🚀 [AI API] Attempting OpenRouter (primary)...");
+      const response = await callOpenRouterAPI(history, currentPrompt, null, contextVerse);
+      console.log("✅ [AI API] OpenRouter succeeded");
+      return response;
+    } catch (error) {
+      console.warn("⚠️ [AI API] OpenRouter failed, falling back to Gemini:", {
+        errorMessage: error.message,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Fall through to Gemini fallback
+    }
+  } else {
+    console.log("ℹ️ [AI API] OpenRouter API key not configured, using Gemini");
+  }
+
+  // Fallback to Gemini
+  if (GEMINI_API_KEY) {
+    console.log("🔄 [AI API] Using Gemini (fallback)...");
+    const response = await callGeminiAPI(history, currentPrompt, mediaFile, contextVerse);
+    
+    // If Gemini also has rate limits and OpenRouter is available, try OpenRouter as last resort
+    if (isRateLimitError(response) && OPENROUTER_API_KEY) {
+      console.warn("⚠️ [AI API] Gemini rate limited, trying OpenRouter as last resort...");
+      try {
+        return await callOpenRouterAPI(history, currentPrompt, null, contextVerse);
+      } catch (openRouterError) {
+        console.error("❌ [AI API] OpenRouter also failed:", openRouterError.message);
+        // Return the Gemini rate limit message since both failed
+        return response;
+      }
+    }
+    
+    console.log("✅ [AI API] Gemini succeeded");
+    return response;
+  }
+
+  // If neither API is configured
+  return "Please configure either REACT_APP_OPENROUTER_API_KEY or REACT_APP_GEMINI_API_KEY in your .env file.";
+};
+
+const enhancePromptWithAI = async (userPrompt) => {
+  // Use AI (OpenRouter or Gemini) to enhance the user's image prompt for better Stable Diffusion results
   try {
     console.log("✨ [Prompt Enhancement] Starting enhancement...", {
       originalPrompt: userPrompt,
@@ -220,51 +462,90 @@ Please enhance this into a detailed, optimized Stable Diffusion prompt that will
 
 Enhanced prompt:`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: enhancementInstruction }] }],
-          generationConfig: { 
-            temperature: 0.8, 
-            maxOutputTokens: 200,
-            topP: 0.95,
-            topK: 40
+    // Try OpenRouter first for prompt enhancement
+    if (OPENROUTER_API_KEY) {
+      try {
+        console.log("🚀 [Prompt Enhancement] Attempting OpenRouter...");
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+            'HTTP-Referer': window.location.origin,
+            'X-Title': 'Shankhnaad AI'
+          },
+          body: JSON.stringify({
+            model: OPENROUTER_MODEL,
+            messages: [
+              { role: 'user', content: enhancementInstruction }
+            ],
+            temperature: 0.8,
+            max_tokens: 200
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const enhancedPrompt = data.choices?.[0]?.message?.content?.trim();
+          
+          if (enhancedPrompt && enhancedPrompt.length > 0) {
+            console.log("✅ [Prompt Enhancement] OpenRouter success!", {
+              original: userPrompt,
+              enhanced: enhancedPrompt,
+              timestamp: new Date().toISOString()
+            });
+            return enhancedPrompt;
           }
-        }),
+        } else {
+          console.warn("⚠️ [Prompt Enhancement] OpenRouter failed, trying Gemini fallback");
+        }
+      } catch (openRouterError) {
+        console.warn("⚠️ [Prompt Enhancement] OpenRouter error, trying Gemini fallback:", openRouterError.message);
       }
-    );
+    }
 
-    console.log("📥 [Prompt Enhancement] Response received:", {
-      status: response.status,
-      ok: response.ok,
-      timestamp: new Date().toISOString()
-    });
+    // Fallback to Gemini
+    if (GEMINI_API_KEY) {
+      console.log("🔄 [Prompt Enhancement] Using Gemini fallback...");
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: enhancementInstruction }] }],
+            generationConfig: { 
+              temperature: 0.8, 
+              maxOutputTokens: 200,
+              topP: 0.95,
+              topK: 40
+            }
+          }),
+        }
+      );
 
-    if (!response.ok) {
-      console.warn("⚠️ [Prompt Enhancement] Failed, using original prompt", {
+      console.log("📥 [Prompt Enhancement] Gemini response received:", {
         status: response.status,
-        statusText: response.statusText,
+        ok: response.ok,
         timestamp: new Date().toISOString()
       });
-      return userPrompt;
-    }
 
-    const data = await response.json();
-    const enhancedPrompt = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-    
-    if (enhancedPrompt && enhancedPrompt.length > 0) {
-      console.log("✅ [Prompt Enhancement] Success!", {
-        original: userPrompt,
-        enhanced: enhancedPrompt,
-        timestamp: new Date().toISOString()
-      });
-      return enhancedPrompt;
+      if (response.ok) {
+        const data = await response.json();
+        const enhancedPrompt = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        
+        if (enhancedPrompt && enhancedPrompt.length > 0) {
+          console.log("✅ [Prompt Enhancement] Gemini success!", {
+            original: userPrompt,
+            enhanced: enhancedPrompt,
+            timestamp: new Date().toISOString()
+          });
+          return enhancedPrompt;
+        }
+      }
     }
     
-    console.warn("⚠️ [Prompt Enhancement] No enhanced prompt returned, using original");
+    console.warn("⚠️ [Prompt Enhancement] All enhancement methods failed, using original prompt");
     return userPrompt;
   } catch (error) {
     console.error("❌ [Prompt Enhancement] Error:", {
@@ -296,8 +577,8 @@ const callStableDiffusionAPI = async (prompt) => {
       return null;
     }
     
-    // Enhance prompt with Gemini for better results
-    const enhancedPrompt = await enhancePromptWithGemini(prompt);
+    // Enhance prompt with AI (OpenRouter or Gemini) for better results
+    const enhancedPrompt = await enhancePromptWithAI(prompt);
     console.log("📝 [Stable Diffusion] Using enhanced prompt for generation");
     
     // Use Pollinations.ai with direct URL embedding
@@ -940,7 +1221,7 @@ export default function App() {
       
       try {
         const bestVerse = findBestVerse(lastUserMsg.content);
-        const aiResponseText = await callGeminiAPI(historyContext, lastUserMsg.content, null, bestVerse);
+        const aiResponseText = await callAIAPI(historyContext, lastUserMsg.content, null, bestVerse);
         
         const updatedMessages = [...messages];
         updatedMessages[index].drafts.push(aiResponseText);
@@ -1027,7 +1308,7 @@ export default function App() {
         if (maybeImageRequest && text.length < 150) {
           // Quick heuristic: if message is short and contains image-related words, ask AI to clarify
           const bestVerse = findBestVerse(text);
-          const preliminaryResponse = await callGeminiAPI(currentHistory, text, fileToUpload, bestVerse);
+          const preliminaryResponse = await callAIAPI(currentHistory, text, fileToUpload, bestVerse);
           
           // Check if AI's response suggests generating an image would be helpful
           // If the user's request seems like it wants a visual, generate an image
@@ -1052,7 +1333,7 @@ export default function App() {
         } else {
           // Regular text conversation
           const bestVerse = findBestVerse(text);
-          aiResponseText = await callGeminiAPI(currentHistory, text, fileToUpload, bestVerse);
+          aiResponseText = await callAIAPI(currentHistory, text, fileToUpload, bestVerse);
         }
       }
 

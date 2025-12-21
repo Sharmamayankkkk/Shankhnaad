@@ -2,11 +2,11 @@
 
 **Live at:** [https://shankhnaad.krishnaconnect.org/](https://shankhnaad.krishnaconnect.org/)
 
-A spiritual AI chatbot powered by Google's Gemini AI, offering wisdom from the Bhagavad Gita and AI-enhanced image generation capabilities.
+A spiritual AI chatbot powered by OpenRouter (Llama 3.1 405B) and Google's Gemini AI as fallback, offering wisdom from the Bhagavad Gita and AI-enhanced image generation capabilities.
 
 ## ✨ Features
 
-- 💬 **AI Chat**: Powered by Gemini 2.5 Flash for spiritual guidance
+- 💬 **AI Chat**: Powered by OpenRouter (Llama 3.1 405B Instruct) with Gemini as fallback for reliable spiritual guidance
 - 🎨 **AI Image Generation**: Create stunning artwork using Stable Diffusion with AI-enhanced prompts
 - 🤖 **Intelligent Detection**: Automatically detects image requests in natural conversation
 - 🖼️ **Image Preview**: Click to view full-size images in modal with download option
@@ -16,6 +16,7 @@ A spiritual AI chatbot powered by Google's Gemini AI, offering wisdom from the B
 - 📱 **Responsive Design**: Optimized for all screen sizes
 - 🎭 **Loading Animations**: Gemini-style loading with video support
 - 🛡️ **Content Safety**: Explicit content filtering
+- 🔄 **Smart Fallback**: Automatically switches to Gemini if OpenRouter has rate limits or issues
 
 ## Quick Start
 
@@ -38,8 +39,9 @@ A spiritual AI chatbot powered by Google's Gemini AI, offering wisdom from the B
 
 3. Set up environment variables:
    ```bash
-   # Create .env file and add your Gemini API key
-   # REACT_APP_GEMINI_API_KEY is required for chat and prompt enhancement
+   # Create .env file and add your API keys
+   # REACT_APP_OPENROUTER_API_KEY is the primary API for chat and prompt enhancement
+   # REACT_APP_GEMINI_API_KEY is used as fallback when OpenRouter has issues or for multimodal features
    ```
 
 4. (Optional) Add custom loading animation:
@@ -59,7 +61,7 @@ A spiritual AI chatbot powered by Google's Gemini AI, offering wisdom from the B
 
 **Zero Configuration Required!**
 
-- ✅ **AI-Enhanced Prompts**: Gemini automatically optimizes your prompts for better results
+- ✅ **AI-Enhanced Prompts**: OpenRouter (Llama 3.1 405B) or Gemini automatically optimizes your prompts for better results
 - ✅ **Flexible Detection**: Works with "Generate a image", "I want a picture of", "Show me", etc.
 - ✅ **No API Keys**: Uses free Pollinations.ai Stable Diffusion service
 - ✅ **Responsive Images**: Adapts to all screen sizes
@@ -79,11 +81,18 @@ For more details, see: **[IMAGE_GENERATION_SETUP.md](./IMAGE_GENERATION_SETUP.md
 Create a `.env` file in the root directory:
 
 ```env
-# Required for AI chat and prompt enhancement
+# Primary AI API - OpenRouter with Llama 3.1 405B Instruct (Free)
+REACT_APP_OPENROUTER_API_KEY=your_openrouter_api_key
+
+# Fallback AI API - used when OpenRouter has issues or for multimodal features
 REACT_APP_GEMINI_API_KEY=your_gemini_api_key
 
 # Image generation works without any token!
 ```
+
+**Note:** The app will work with either API key, but having both provides the best experience:
+- OpenRouter (Llama 3.1 405B Instruct) is used as the primary API for optimal performance
+- Gemini is used as fallback when OpenRouter has rate limits or for multimodal features (image/audio/video analysis)
 
 ## 🎭 Custom Loading Animation
 
