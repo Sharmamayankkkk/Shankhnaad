@@ -13,11 +13,25 @@ import {
 // Import real data for RAG
 import gitaDataRaw from './data/gita_data.json';
 
+// Import local model service
+import { 
+  initializeLocalModel, 
+  generateLocalText, 
+  formatChatPrompt, 
+  getLocalModelStatus,
+  checkBrowserCompatibility,
+  DEFAULT_MODEL
+} from './services/localModelService';
+
 /* --- CONFIGURATION --- */
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY || "";
 const OPENROUTER_API_KEY = process.env.REACT_APP_OPENROUTER_API_KEY || "";
 const OPENROUTER_MODEL = "meta-llama/llama-3.1-405b-instruct:free";
 const OPENROUTER_VISION_MODEL = "google/gemma-3-4b-it:free";
+
+// Local model configuration
+const ENABLE_LOCAL_MODELS = process.env.REACT_APP_ENABLE_LOCAL_MODELS === 'true' || true; // Default to true
+const LOCAL_MODEL_PREFERENCE = process.env.REACT_APP_LOCAL_MODEL_PREFERENCE || 'auto'; // 'local', 'cloud', or 'auto'
 
 // Image generation messages
 const IMAGE_GEN_SUCCESS_MSG = "I have manifested this divine vision for you using Stable Diffusion. 🎨✨";
@@ -440,6 +454,131 @@ const callAIAPI = async (history, currentPrompt, mediaFile, contextVerse) => {
   return "Please configure either REACT_APP_OPENROUTER_API_KEY or REACT_APP_GEMINI_API_KEY in your .env file.";
 };
 
+/**
+ * Local Model API - Uses browser-based LLM for text generation
+ * @param {Array} history - Conversation history
+ * @param {string} currentPrompt - Current user message
+ * @param {Object} contextVerse - Optional scripture context
+ * @returns {Promise<string>} - AI response
+ */
+const callLocalModelAPI = async (history, currentPrompt, contextVerse) => {
+  try {
+    console.log('🖥️ [Local Model API] Starting local inference...');
+    
+    // Get system instruction
+    const systemInstruction = getSystemInstruction(contextVerse);
+    
+    // Format the prompt for the local model
+    const formattedPrompt = formatChatPrompt(history, currentPrompt, systemInstruction);
+    
+    // Generate response using local model
+    const response = await generateLocalText(formattedPrompt, {
+      max_new_tokens: 400,
+      temperature: 0.7
+    });
+    
+    console.log('✅ [Local Model API] Generation successful');
+    return response;
+    
+  } catch (error) {
+    console.error('❌ [Local Model API] Error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Unified AI API - Intelligently routes to local or cloud models
+ * @param {Array} history - Conversation history
+ * @param {string} currentPrompt - Current user message
+ * @param {File} mediaFile - Optional media file (images, audio, video)
+ * @param {Object} contextVerse - Optional scripture context
+ * @param {string} mode - 'auto', 'local', or 'cloud'
+ * @returns {Promise<string>} - AI response
+ */
+const callUnifiedAIAPI = async (history, currentPrompt, mediaFile, contextVerse, mode = LOCAL_MODEL_PREFERENCE) => {
+  console.log('🔀 [Unified AI] Routing request...', {
+    mode,
+    hasMedia: !!mediaFile,
+    enableLocalModels: ENABLE_LOCAL_MODELS,
+    timestamp: new Date().toISOString()
+  });
+
+  // If media is present, always use cloud API (local models don't support multimodal yet)
+  if (mediaFile) {
+    console.log('📸 [Unified AI] Media detected, using cloud API');
+    return await callAIAPI(history, currentPrompt, mediaFile, contextVerse);
+  }
+
+  // Check if local models are enabled
+  if (!ENABLE_LOCAL_MODELS) {
+    console.log('☁️ [Unified AI] Local models disabled, using cloud API');
+    return await callAIAPI(history, currentPrompt, null, contextVerse);
+  }
+
+  // Mode: 'local' - Always try local first
+  if (mode === 'local') {
+    console.log('🖥️ [Unified AI] Local mode: Attempting local model first');
+    try {
+      return await callLocalModelAPI(history, currentPrompt, contextVerse);
+    } catch (error) {
+      console.warn('⚠️ [Unified AI] Local model failed, falling back to cloud:', error.message);
+      return await callAIAPI(history, currentPrompt, null, contextVerse);
+    }
+  }
+
+  // Mode: 'cloud' - Always use cloud
+  if (mode === 'cloud') {
+    console.log('☁️ [Unified AI] Cloud mode: Using cloud API');
+    return await callAIAPI(history, currentPrompt, null, contextVerse);
+  }
+
+  // Mode: 'auto' (default) - Smart routing
+  console.log('🤖 [Unified AI] Auto mode: Smart routing');
+  
+  // First, check if we have cloud API keys
+  const hasCloudAPI = OPENROUTER_API_KEY || GEMINI_API_KEY;
+  
+  if (!hasCloudAPI) {
+    console.log('🖥️ [Unified AI] No cloud API keys, using local model');
+    try {
+      return await callLocalModelAPI(history, currentPrompt, contextVerse);
+    } catch (error) {
+      console.error('❌ [Unified AI] Local model failed and no cloud API available');
+      return "Unable to generate response. Please configure API keys or ensure local model is working.";
+    }
+  }
+
+  // Try cloud API first (better quality)
+  try {
+    console.log('☁️ [Unified AI] Attempting cloud API (better quality)...');
+    const response = await callAIAPI(history, currentPrompt, null, contextVerse);
+    
+    // Check if we got rate limited
+    if (isRateLimitError(response)) {
+      console.warn('⚠️ [Unified AI] Cloud API rate limited, falling back to local model');
+      try {
+        return await callLocalModelAPI(history, currentPrompt, contextVerse);
+      } catch (localError) {
+        console.error('❌ [Unified AI] Local model also failed:', localError.message);
+        // Return the rate limit message from cloud
+        return response + "\n\n💡 Tip: Local model is also available but currently not loaded. Please refresh the page to enable local inference.";
+      }
+    }
+    
+    console.log('✅ [Unified AI] Cloud API succeeded');
+    return response;
+    
+  } catch (cloudError) {
+    console.warn('⚠️ [Unified AI] Cloud API failed, falling back to local model:', cloudError.message);
+    try {
+      return await callLocalModelAPI(history, currentPrompt, contextVerse);
+    } catch (localError) {
+      console.error('❌ [Unified AI] Both cloud and local failed');
+      return "I'm having trouble connecting right now. Please try again in a moment.";
+    }
+  }
+};
+
 const enhancePromptWithAI = async (userPrompt) => {
   // Use AI (OpenRouter or Gemini) to enhance the user's image prompt for better Stable Diffusion results
   try {
@@ -826,12 +965,73 @@ const ReportModal = ({ isOpen, onClose, addToast }) => {
   );
 };
 
-const SettingsModal = ({ isOpen, onClose, addToast }) => {
+const SettingsModal = ({ isOpen, onClose, addToast, useLocalModel, setUseLocalModel, localModelStatus, onInitLocalModel }) => {
   if (!isOpen) return null;
+  
+  const hasCloudAPI = OPENROUTER_API_KEY || GEMINI_API_KEY;
+  
   return (
     <ModalWrapper onClose={onClose}>
         <div className="flex items-center gap-2 mb-6 text-lg font-bold text-white"><Settings size={20}/> Settings</div>
         <div className="space-y-4">
+           {/* Local Model Section */}
+           {ENABLE_LOCAL_MODELS && (
+             <div className="border border-[#444746] rounded-lg p-4 space-y-3">
+               <div className="flex items-center justify-between">
+                 <div>
+                   <span className="text-sm font-semibold text-white">Use Local Model</span>
+                   <p className="text-xs text-gray-400 mt-1">Run AI locally in your browser (no API keys needed)</p>
+                 </div>
+                 <button
+                   onClick={() => setUseLocalModel(!useLocalModel)}
+                   className={`w-10 h-5 rounded-full relative transition-colors ${useLocalModel ? 'bg-green-500' : 'bg-[#004a77]'}`}
+                 >
+                   <div className={`w-3 h-3 bg-white rounded-full absolute top-1 transition-all ${useLocalModel ? 'right-1' : 'left-1'}`}></div>
+                 </button>
+               </div>
+               
+               {/* Model Status */}
+               <div className="text-xs text-gray-400 space-y-1">
+                 {localModelStatus.ready && (
+                   <div className="flex items-center gap-2 text-green-400">
+                     <Check size={14} />
+                     <span>Local model ready</span>
+                   </div>
+                 )}
+                 {localModelStatus.loading && (
+                   <div className="flex items-center gap-2 text-blue-400">
+                     <Loader2 size={14} className="animate-spin" />
+                     <span>Loading local model...</span>
+                   </div>
+                 )}
+                 {localModelStatus.error && (
+                   <div className="flex items-center gap-2 text-red-400">
+                     <XCircle size={14} />
+                     <span>{localModelStatus.error}</span>
+                   </div>
+                 )}
+                 {!localModelStatus.ready && !localModelStatus.loading && !localModelStatus.error && (
+                   <button
+                     onClick={onInitLocalModel}
+                     className="text-blue-400 hover:text-blue-300 underline"
+                   >
+                     Initialize local model
+                   </button>
+                 )}
+               </div>
+               
+               <div className="text-xs text-gray-500">
+                 <p>• Model: {DEFAULT_MODEL.name} ({DEFAULT_MODEL.size})</p>
+                 <p>• Speed: {DEFAULT_MODEL.speed}</p>
+                 <p>• Quality: {DEFAULT_MODEL.quality}</p>
+                 {!hasCloudAPI && (
+                   <p className="text-yellow-400 mt-2">⚠️ No cloud API keys configured. Local model will be used automatically.</p>
+                 )}
+               </div>
+             </div>
+           )}
+           
+           {/* Existing settings */}
            <div className="flex items-center justify-between p-2">
              <span className="text-sm text-gray-200">Stream Responses</span>
              <div className="w-10 h-5 bg-[#004a77] rounded-full relative cursor-pointer"><div className="w-3 h-3 bg-white rounded-full absolute right-1 top-1"></div></div>
@@ -1106,6 +1306,13 @@ export default function App() {
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [currentImageUrl, setCurrentImageUrl] = useState(null);
 
+  // Local model state
+  const [useLocalModel, setUseLocalModel] = useState(
+    () => localStorage.getItem('shankhnaad_use_local_model') === 'true' || false
+  );
+  const [localModelStatus, setLocalModelStatus] = useState({ ready: false, loading: false, error: null });
+  const [localModelInitializing, setLocalModelInitializing] = useState(false);
+
   const addToast = (msg, type = 'success') => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, msg, type }]);
@@ -1117,6 +1324,74 @@ export default function App() {
   });
 
   useEffect(() => { localStorage.setItem('shankhnaad_chat_history_v7', JSON.stringify(chatHistory)); }, [chatHistory]);
+
+  // Persist local model preference
+  useEffect(() => {
+    localStorage.setItem('shankhnaad_use_local_model', useLocalModel.toString());
+  }, [useLocalModel]);
+
+  // Check browser compatibility and initialize local model if enabled
+  useEffect(() => {
+    if (!ENABLE_LOCAL_MODELS) return;
+
+    const compatibility = checkBrowserCompatibility();
+    console.log('🔍 [Browser Compatibility]', compatibility);
+
+    if (!compatibility.supported) {
+      console.warn('⚠️ [Local Model] Browser not compatible with local models');
+      setLocalModelStatus({
+        ready: false,
+        loading: false,
+        error: 'Browser not compatible with local models'
+      });
+      return;
+    }
+
+    if (compatibility.warnings.length > 0) {
+      console.warn('⚠️ [Local Model] Compatibility warnings:', compatibility.warnings);
+    }
+
+    // Update status from the service
+    const status = getLocalModelStatus();
+    setLocalModelStatus(status);
+  }, []);
+
+  // Function to initialize local model
+  const initLocalModel = async () => {
+    if (localModelInitializing) {
+      console.log('⏳ [Local Model] Already initializing...');
+      return;
+    }
+
+    setLocalModelInitializing(true);
+    setLocalModelStatus({ ready: false, loading: true, error: null });
+
+    try {
+      const success = await initializeLocalModel(DEFAULT_MODEL.id, (progress) => {
+        console.log('📊 [Local Model] Progress:', progress);
+        if (progress.status === 'downloading') {
+          addToast(`Loading local model: ${progress.progress}%`, 'info');
+        }
+      });
+
+      if (success) {
+        setLocalModelStatus({ ready: true, loading: false, error: null });
+        addToast('Local model loaded successfully! 🎉', 'success');
+      } else {
+        throw new Error('Failed to initialize model');
+      }
+    } catch (error) {
+      console.error('❌ [Local Model] Initialization error:', error);
+      setLocalModelStatus({ 
+        ready: false, 
+        loading: false, 
+        error: error.message 
+      });
+      addToast('Failed to load local model', 'error');
+    } finally {
+      setLocalModelInitializing(false);
+    }
+  };
 
   const updateChat = (id, updates) => setChatHistory(prev => prev.map(chat => chat.id === id ? { ...chat, ...updates } : chat));
 
@@ -1221,7 +1496,7 @@ export default function App() {
       
       try {
         const bestVerse = findBestVerse(lastUserMsg.content);
-        const aiResponseText = await callAIAPI(historyContext, lastUserMsg.content, null, bestVerse);
+        const aiResponseText = await callUnifiedAIAPI(historyContext, lastUserMsg.content, null, bestVerse, useLocalModel ? 'local' : 'auto');
         
         const updatedMessages = [...messages];
         updatedMessages[index].drafts.push(aiResponseText);
@@ -1308,7 +1583,7 @@ export default function App() {
         if (maybeImageRequest && text.length < 150) {
           // Quick heuristic: if message is short and contains image-related words, ask AI to clarify
           const bestVerse = findBestVerse(text);
-          const preliminaryResponse = await callAIAPI(currentHistory, text, fileToUpload, bestVerse);
+          const preliminaryResponse = await callUnifiedAIAPI(currentHistory, text, fileToUpload, bestVerse, useLocalModel ? 'local' : 'auto');
           
           // Check if AI's response suggests generating an image would be helpful
           // If the user's request seems like it wants a visual, generate an image
@@ -1333,7 +1608,7 @@ export default function App() {
         } else {
           // Regular text conversation
           const bestVerse = findBestVerse(text);
-          aiResponseText = await callAIAPI(currentHistory, text, fileToUpload, bestVerse);
+          aiResponseText = await callUnifiedAIAPI(currentHistory, text, fileToUpload, bestVerse, useLocalModel ? 'local' : 'auto');
         }
       }
 
@@ -1534,7 +1809,18 @@ export default function App() {
                         </button>
                       )}
                    </div>
-                   <p className="text-center text-[10px] text-gray-600 mt-2">Shankhnaad may produce inaccurate information.</p>
+                   <div className="flex items-center justify-between text-[10px] text-gray-600 mt-2">
+                     <span>Shankhnaad may produce inaccurate information.</span>
+                     {ENABLE_LOCAL_MODELS && useLocalModel && (
+                       <span className="flex items-center gap-1">
+                         {localModelStatus.ready ? (
+                           <><span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span> Local Model</>
+                         ) : (
+                           <><span className="w-1.5 h-1.5 bg-yellow-400 rounded-full"></span> Loading...</>
+                         )}
+                       </span>
+                     )}
+                   </div>
                 </div>
               </div>
            </>
@@ -1543,7 +1829,15 @@ export default function App() {
       </div>
 
       <ReportModal isOpen={reportModalOpen} onClose={() => setReportModalOpen(false)} messageId={activeReportId} addToast={addToast} />
-      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} addToast={addToast} />
+      <SettingsModal 
+        isOpen={settingsOpen} 
+        onClose={() => setSettingsOpen(false)} 
+        addToast={addToast}
+        useLocalModel={useLocalModel}
+        setUseLocalModel={setUseLocalModel}
+        localModelStatus={localModelStatus}
+        onInitLocalModel={initLocalModel}
+      />
       <HelpModal isOpen={helpOpen} onClose={() => setHelpOpen(false)} />
       
       {shareModalOpen && currentShareChat && (
