@@ -91,7 +91,7 @@ REACT_APP_GEMINI_API_KEY=your_gemini_api_key
 ```
 
 **Note:** The app will work with either API key, but having both provides the best experience:
-- OpenRouter (Llama 3.1 405B Instruct) is used as the primary API for maximum operation
+- OpenRouter (Llama 3.1 405B Instruct) is used as the primary API for optimal performance
 - Gemini is used as fallback when OpenRouter has rate limits or for multimodal features (image/audio/video analysis)
 
 ## 🎭 Custom Loading Animation

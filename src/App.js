@@ -325,13 +325,32 @@ const callOpenRouterAPI = async (history, currentPrompt, mediaFile, contextVerse
 const callAIAPI = async (history, currentPrompt, mediaFile, contextVerse) => {
   // Unified AI API caller - tries OpenRouter first, falls back to Gemini
   
-  // If media file is provided, use Gemini directly as OpenRouter may not support it well
+  // If media file is provided, try Gemini first (for multimodal support), but fallback to OpenRouter if rate limited
   if (mediaFile) {
-    console.log("📸 [AI API] Media file detected, using Gemini for multimodal support");
-    return await callGeminiAPI(history, currentPrompt, mediaFile, contextVerse);
+    console.log("📸 [AI API] Media file detected, trying Gemini for multimodal support");
+    if (GEMINI_API_KEY) {
+      try {
+        const response = await callGeminiAPI(history, currentPrompt, mediaFile, contextVerse);
+        // Check if the response is a rate limit error message
+        if (response && response.includes("Rate limit exceeded")) {
+          console.warn("⚠️ [AI API] Gemini rate limited for media, falling back to OpenRouter without media");
+          // Fallback to OpenRouter without media file
+          if (OPENROUTER_API_KEY) {
+            return await callOpenRouterAPI(history, currentPrompt + "\n\n[Note: A media file was attached but couldn't be processed]", null, contextVerse);
+          }
+        }
+        return response;
+      } catch (error) {
+        console.warn("⚠️ [AI API] Gemini failed for media, trying OpenRouter without media:", error.message);
+        if (OPENROUTER_API_KEY) {
+          return await callOpenRouterAPI(history, currentPrompt + "\n\n[Note: A media file was attached but couldn't be processed]", null, contextVerse);
+        }
+        throw error;
+      }
+    }
   }
 
-  // Try OpenRouter first
+  // Try OpenRouter first for text
   if (OPENROUTER_API_KEY) {
     try {
       console.log("🚀 [AI API] Attempting OpenRouter (primary)...");
@@ -354,6 +373,19 @@ const callAIAPI = async (history, currentPrompt, mediaFile, contextVerse) => {
   if (GEMINI_API_KEY) {
     console.log("🔄 [AI API] Using Gemini (fallback)...");
     const response = await callGeminiAPI(history, currentPrompt, mediaFile, contextVerse);
+    
+    // If Gemini also has rate limits and OpenRouter is available, try OpenRouter as last resort
+    if (response && response.includes("Rate limit exceeded") && OPENROUTER_API_KEY) {
+      console.warn("⚠️ [AI API] Gemini rate limited, trying OpenRouter as last resort...");
+      try {
+        return await callOpenRouterAPI(history, currentPrompt, null, contextVerse);
+      } catch (openRouterError) {
+        console.error("❌ [AI API] OpenRouter also failed:", openRouterError.message);
+        // Return the Gemini rate limit message since both failed
+        return response;
+      }
+    }
+    
     console.log("✅ [AI API] Gemini succeeded");
     return response;
   }
