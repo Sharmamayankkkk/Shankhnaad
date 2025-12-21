@@ -90,7 +90,7 @@ export const initializeLocalModel = async (modelId = DEFAULT_MODEL.id, progressC
       progress_callback: (progress) => {
         console.log('📦 [Local Model] Download progress:', progress);
         if (progressCallback && progress.status === 'progress') {
-          const percent = progress.loaded && progress.total 
+          const percent = progress.loaded && progress.total && progress.total > 0
             ? Math.round((progress.loaded / progress.total) * 100)
             : 0;
           progressCallback({
@@ -249,6 +249,8 @@ export const unloadLocalModel = () => {
  * @returns {Object} - Compatibility information
  */
 export const checkBrowserCompatibility = () => {
+  const MIN_RECOMMENDED_MEMORY_MB = 500;
+  
   const compatibility = {
     supported: true,
     warnings: [],
@@ -272,7 +274,7 @@ export const checkBrowserCompatibility = () => {
   if (performance.memory) {
     const memoryMB = performance.memory.jsHeapSizeLimit / (1024 * 1024);
     compatibility.features.availableMemory = Math.round(memoryMB);
-    if (memoryMB < 500) {
+    if (memoryMB < MIN_RECOMMENDED_MEMORY_MB) {
       compatibility.warnings.push('Low memory available (may be slow)');
     }
   }

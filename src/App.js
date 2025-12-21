@@ -30,7 +30,7 @@ const OPENROUTER_MODEL = "meta-llama/llama-3.1-405b-instruct:free";
 const OPENROUTER_VISION_MODEL = "google/gemma-3-4b-it:free";
 
 // Local model configuration
-const ENABLE_LOCAL_MODELS = process.env.REACT_APP_ENABLE_LOCAL_MODELS === 'true' || true; // Default to true
+const ENABLE_LOCAL_MODELS = process.env.REACT_APP_ENABLE_LOCAL_MODELS !== 'false'; // Default to true unless explicitly disabled
 const LOCAL_MODEL_PREFERENCE = process.env.REACT_APP_LOCAL_MODEL_PREFERENCE || 'auto'; // 'local', 'cloud', or 'auto'
 
 // Image generation messages
@@ -1393,6 +1393,11 @@ export default function App() {
     }
   };
 
+  // Helper function to determine AI mode based on user preference
+  const getAIMode = () => {
+    return useLocalModel ? 'local' : 'auto';
+  };
+
   const updateChat = (id, updates) => setChatHistory(prev => prev.map(chat => chat.id === id ? { ...chat, ...updates } : chat));
 
   const deleteChat = (id) => {
@@ -1496,7 +1501,7 @@ export default function App() {
       
       try {
         const bestVerse = findBestVerse(lastUserMsg.content);
-        const aiResponseText = await callUnifiedAIAPI(historyContext, lastUserMsg.content, null, bestVerse, useLocalModel ? 'local' : 'auto');
+        const aiResponseText = await callUnifiedAIAPI(historyContext, lastUserMsg.content, null, bestVerse, getAIMode());
         
         const updatedMessages = [...messages];
         updatedMessages[index].drafts.push(aiResponseText);
@@ -1583,7 +1588,7 @@ export default function App() {
         if (maybeImageRequest && text.length < 150) {
           // Quick heuristic: if message is short and contains image-related words, ask AI to clarify
           const bestVerse = findBestVerse(text);
-          const preliminaryResponse = await callUnifiedAIAPI(currentHistory, text, fileToUpload, bestVerse, useLocalModel ? 'local' : 'auto');
+          const preliminaryResponse = await callUnifiedAIAPI(currentHistory, text, fileToUpload, bestVerse, getAIMode());
           
           // Check if AI's response suggests generating an image would be helpful
           // If the user's request seems like it wants a visual, generate an image
@@ -1608,7 +1613,7 @@ export default function App() {
         } else {
           // Regular text conversation
           const bestVerse = findBestVerse(text);
-          aiResponseText = await callUnifiedAIAPI(currentHistory, text, fileToUpload, bestVerse, useLocalModel ? 'local' : 'auto');
+          aiResponseText = await callUnifiedAIAPI(currentHistory, text, fileToUpload, bestVerse, getAIMode());
         }
       }
 
