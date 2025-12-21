@@ -1,5 +1,7 @@
 # Shankhnaad AI - Spiritual Guidance Platform
 
+**Live at:** [https://shankhnaad.krishnaconnect.org/](https://shankhnaad.krishnaconnect.org/)
+
 A spiritual AI chatbot powered by Google's Gemini AI, offering wisdom from the Bhagavad Gita and AI-enhanced image generation capabilities.
 
 ## ✨ Features
