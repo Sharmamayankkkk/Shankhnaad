@@ -126,7 +126,7 @@ const callGeminiAPI = async (history, currentPrompt, mediaFile, contextVerse) =>
   validHistory.push({ role: 'user', parts: currentParts });
 
   console.log("📤 [Gemini API] Sending request:", {
-    url: url.replace(/key=[^&]+/, 'key=***'),
+    endpoint: 'gemini-2.5-flash-preview-09-2025',
     historyLength: validHistory.length,
     hasMedia: !!mediaFile,
     mediaType: mediaFile?.type || 'none',
@@ -155,7 +155,7 @@ const callGeminiAPI = async (history, currentPrompt, mediaFile, contextVerse) =>
       console.error("❌ [Gemini API] HTTP Error:", {
         status: response.status,
         statusText: response.statusText,
-        errorBody: errorText.substring(0, 500), // Log first 500 chars of error
+        hasErrorDetails: !!errorText,
         timestamp: new Date().toISOString()
       });
       
@@ -329,7 +329,7 @@ const callStableDiffusionAPI = async (prompt) => {
         console.error("❌ [Stable Diffusion] Failed to fetch image:", {
           status: response.status,
           statusText: response.statusText,
-          url: imageUrl.substring(0, 100) + '...',
+          service: 'Pollinations.ai',
           timestamp: new Date().toISOString()
         });
         return null;
