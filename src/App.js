@@ -74,7 +74,15 @@ const fileToGenerativePart = async (file) => {
 };
 
 const callGeminiAPI = async (history, currentPrompt, mediaFile, contextVerse) => {
-  if (!GEMINI_API_KEY) return "Please set REACT_APP_GEMINI_API_KEY in your .env file.";
+  if (!GEMINI_API_KEY) {
+    console.error("❌ [Gemini API] API key is missing");
+    console.error("📋 Debug Info:", {
+      envVarName: "REACT_APP_GEMINI_API_KEY",
+      currentValue: GEMINI_API_KEY ? "SET" : "NOT SET",
+      timestamp: new Date().toISOString()
+    });
+    return "Please set REACT_APP_GEMINI_API_KEY in your .env file.";
+  }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
   
@@ -117,6 +125,14 @@ const callGeminiAPI = async (history, currentPrompt, mediaFile, contextVerse) =>
 
   validHistory.push({ role: 'user', parts: currentParts });
 
+  console.log("📤 [Gemini API] Sending request:", {
+    url: url.replace(/key=[^&]+/, 'key=***'),
+    historyLength: validHistory.length,
+    hasMedia: !!mediaFile,
+    mediaType: mediaFile?.type || 'none',
+    timestamp: new Date().toISOString()
+  });
+
   try {
     const response = await fetch(url, {
       method: 'POST',
@@ -127,19 +143,68 @@ const callGeminiAPI = async (history, currentPrompt, mediaFile, contextVerse) =>
       })
     });
 
-    if (!response.ok) throw new Error(`Gemini API Error: ${response.status}`);
+    console.log("📥 [Gemini API] Response received:", {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      timestamp: new Date().toISOString()
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ [Gemini API] HTTP Error:", {
+        status: response.status,
+        statusText: response.statusText,
+        errorBody: errorText.substring(0, 500), // Log first 500 chars of error
+        timestamp: new Date().toISOString()
+      });
+      
+      // Return specific error messages based on status code
+      if (response.status === 401) {
+        return "Authentication failed. Please verify your Gemini API key is correct and active.";
+      } else if (response.status === 403) {
+        return "Access forbidden. Your API key may not have the required permissions.";
+      } else if (response.status === 429) {
+        return "Rate limit exceeded. Please try again in a few moments.";
+      } else if (response.status >= 500) {
+        return "Google's servers are experiencing issues. Please try again later.";
+      }
+      
+      throw new Error(`Gemini API Error: ${response.status} ${response.statusText}`);
+    }
+    
     const data = await response.json();
+    console.log("✅ [Gemini API] Success:", {
+      hasResponse: !!data.candidates?.[0]?.content?.parts?.[0]?.text,
+      responseLength: data.candidates?.[0]?.content?.parts?.[0]?.text?.length || 0,
+      timestamp: new Date().toISOString()
+    });
+    
     return data.candidates?.[0]?.content?.parts?.[0]?.text || "I am meditating on that... (No response)";
   } catch (error) {
-    console.error(error);
-    return "I am having trouble connecting to the spiritual sky. Please check your internet connection.";
+    console.error("❌ [Gemini API] Error caught:", {
+      errorName: error.name,
+      errorMessage: error.message,
+      errorStack: error.stack,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Check for network errors
+    if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
+      return "Network connection error. Please check your internet connection and try again.";
+    }
+    
+    return "I am having trouble connecting to the spiritual sky. Please check your internet connection or try again later.";
   }
 };
 
 const enhancePromptWithGemini = async (userPrompt) => {
   // Use Gemini to enhance the user's image prompt for better Stable Diffusion results
   try {
-    console.log("✨ Enhancing prompt with Gemini AI...");
+    console.log("✨ [Prompt Enhancement] Starting enhancement...", {
+      originalPrompt: userPrompt,
+      timestamp: new Date().toISOString()
+    });
     
     const enhancementInstruction = `You are an expert at writing image generation prompts for Stable Diffusion AI.
     
@@ -172,8 +237,18 @@ Enhanced prompt:`;
       }
     );
 
+    console.log("📥 [Prompt Enhancement] Response received:", {
+      status: response.status,
+      ok: response.ok,
+      timestamp: new Date().toISOString()
+    });
+
     if (!response.ok) {
-      console.warn("⚠️ Prompt enhancement failed, using original prompt");
+      console.warn("⚠️ [Prompt Enhancement] Failed, using original prompt", {
+        status: response.status,
+        statusText: response.statusText,
+        timestamp: new Date().toISOString()
+      });
       return userPrompt;
     }
 
@@ -181,15 +256,23 @@ Enhanced prompt:`;
     const enhancedPrompt = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
     
     if (enhancedPrompt && enhancedPrompt.length > 0) {
-      console.log("✅ Prompt enhanced successfully!");
-      console.log("📝 Original:", userPrompt);
-      console.log("✨ Enhanced:", enhancedPrompt);
+      console.log("✅ [Prompt Enhancement] Success!", {
+        original: userPrompt,
+        enhanced: enhancedPrompt,
+        timestamp: new Date().toISOString()
+      });
       return enhancedPrompt;
     }
     
+    console.warn("⚠️ [Prompt Enhancement] No enhanced prompt returned, using original");
     return userPrompt;
   } catch (error) {
-    console.error("❌ Prompt enhancement error:", error);
+    console.error("❌ [Prompt Enhancement] Error:", {
+      errorName: error.name,
+      errorMessage: error.message,
+      originalPrompt: userPrompt,
+      timestamp: new Date().toISOString()
+    });
     return userPrompt; // Fallback to original prompt
   }
 };
@@ -199,17 +282,23 @@ const callStableDiffusionAPI = async (prompt) => {
   // With Gemini prompt enhancement, content filtering and proper URL handling
   
   try {
-    console.log("🎨 Generating AI image with Stable Diffusion:", prompt);
+    console.log("🎨 [Stable Diffusion] Starting generation:", {
+      prompt: prompt,
+      timestamp: new Date().toISOString()
+    });
     
     // Content filtering - block explicit content
     if (containsExplicitContent(prompt)) {
-      console.warn("🚫 Blocked explicit content request");
+      console.warn("🚫 [Stable Diffusion] Blocked explicit content request:", {
+        prompt: prompt,
+        timestamp: new Date().toISOString()
+      });
       return null;
     }
     
     // Enhance prompt with Gemini for better results
     const enhancedPrompt = await enhancePromptWithGemini(prompt);
-    console.log("📝 Using enhanced prompt for generation");
+    console.log("📝 [Stable Diffusion] Using enhanced prompt for generation");
     
     // Use Pollinations.ai with direct URL embedding
     const encodedPrompt = encodeURIComponent(enhancedPrompt);
@@ -218,32 +307,63 @@ const callStableDiffusionAPI = async (prompt) => {
     // Generate image URL
     const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&model=flux&nologo=true&enhance=true`;
     
-    console.log("🌸 Using Pollinations.ai Stable Diffusion...");
+    console.log("🌸 [Stable Diffusion] Using Pollinations.ai...", {
+      service: "Pollinations.ai",
+      model: "flux",
+      seed: seed,
+      timestamp: new Date().toISOString()
+    });
     
     // Fetch the image and convert to blob to avoid exposing URL
     try {
       const response = await fetch(imageUrl);
+      
+      console.log("📥 [Stable Diffusion] Image fetch response:", {
+        status: response.status,
+        ok: response.ok,
+        contentType: response.headers.get('content-type'),
+        timestamp: new Date().toISOString()
+      });
+      
       if (!response.ok) {
-        console.error("❌ Failed to fetch image:", response.status);
+        console.error("❌ [Stable Diffusion] Failed to fetch image:", {
+          status: response.status,
+          statusText: response.statusText,
+          url: imageUrl.substring(0, 100) + '...',
+          timestamp: new Date().toISOString()
+        });
         return null;
       }
       
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
       
-      console.log("✅ Stable Diffusion image generated and cached!");
+      console.log("✅ [Stable Diffusion] Image generated and cached!", {
+        blobSize: blob.size,
+        blobType: blob.type,
+        timestamp: new Date().toISOString()
+      });
       
       // Store blob reference for proper cleanup
       return { url: blobUrl, blob: blob };
       
     } catch (fetchError) {
-      console.warn("⚠️ Could not fetch image, using direct URL:", fetchError?.message || fetchError);
+      console.warn("⚠️ [Stable Diffusion] Could not fetch image, using direct URL:", {
+        errorName: fetchError.name,
+        errorMessage: fetchError.message,
+        timestamp: new Date().toISOString()
+      });
       // Fallback to direct URL if fetch fails
       return { url: imageUrl, blob: null };
     }
     
   } catch (error) {
-    console.error("❌ Stable Diffusion generation error:", error?.message || error);
+    console.error("❌ [Stable Diffusion] Generation error:", {
+      errorName: error.name,
+      errorMessage: error.message,
+      errorStack: error.stack,
+      timestamp: new Date().toISOString()
+    });
     return null;
   }
 };
@@ -830,6 +950,12 @@ export default function App() {
         addToast('New draft generated', 'success');
 
       } catch(e) { 
+        console.error("❌ [Regenerate] Error caught:", {
+          errorName: e.name,
+          errorMessage: e.message,
+          errorStack: e.stack,
+          timestamp: new Date().toISOString()
+        });
         addToast('Regeneration failed', 'error'); 
       } finally { setIsTyping(false); }
     }
@@ -956,6 +1082,12 @@ export default function App() {
         }, ...prev]);
       }
     } catch (error) {
+      console.error("❌ [Send Message] Error caught:", {
+        errorName: error.name,
+        errorMessage: error.message,
+        errorStack: error.stack,
+        timestamp: new Date().toISOString()
+      });
       setMessages(prev => [...prev, { role: 'model', content: "Connection interrupted." }]);
       addToast('Failed to send message', 'error');
     } finally {
@@ -1000,7 +1132,10 @@ export default function App() {
                          <li>Stable Diffusion (via Pollinations.ai) for AI image generation</li>
                          <li>Local RAG with Gita Database</li>
                        </ul>
-                       <div className="mt-4 pt-4 border-t border-[#444746]">
+                       <div className="mt-4 pt-4 border-t border-[#444746] space-y-2">
+                         <p className="text-xs text-gray-500">
+                           <strong>Official Website:</strong> <a href="https://shankhnaad.krishnaconnect.org/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">shankhnaad.krishnaconnect.org</a>
+                         </p>
                          <p className="text-xs text-gray-500">Image Generation: Powered by <a href="https://pollinations.ai" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">Pollinations.ai</a> using Stable Diffusion models</p>
                        </div>
                     </div>
