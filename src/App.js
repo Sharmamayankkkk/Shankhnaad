@@ -17,7 +17,7 @@ import gitaDataRaw from './data/gita_data.json';
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY || "";
 const OPENROUTER_API_KEY = process.env.REACT_APP_OPENROUTER_API_KEY || "";
 const OPENROUTER_MODEL = "meta-llama/llama-3.1-405b-instruct:free";
-const MEDIA_FALLBACK_NOTE = "\n\n[Note: A media file was attached but couldn't be processed. The Llama 3.1 405B model doesn't support image analysis. For image analysis, please use Gemini or describe the image in text.]";
+const OPENROUTER_VISION_MODEL = "google/gemma-3-4b-it:free";
 
 // Image generation messages
 const IMAGE_GEN_SUCCESS_MSG = "I have manifested this divine vision for you using Stable Diffusion. 🎨✨";
@@ -232,6 +232,9 @@ const callOpenRouterAPI = async (history, currentPrompt, mediaFile, contextVerse
   // Get system instruction with optional verse context (shared with Gemini)
   const systemInstructionText = getSystemInstruction(contextVerse);
 
+  // Choose model based on whether media is present
+  const modelToUse = mediaFile ? OPENROUTER_VISION_MODEL : OPENROUTER_MODEL;
+
   // Convert history to OpenRouter format
   const messages = [
     { role: 'system', content: systemInstructionText }
@@ -247,22 +250,43 @@ const callOpenRouterAPI = async (history, currentPrompt, mediaFile, contextVerse
       });
     });
 
-  // Add current message
-  // Note: OpenRouter doesn't support multimodal in the same way as Gemini for all models
-  // For now, we'll handle text only and fall back to Gemini for media
+  // Add current message with optional media (following OpenRouter format)
   if (mediaFile) {
-    console.warn("⚠️ [OpenRouter API] Media files not supported, will fallback to Gemini");
-    throw new Error("Media not supported by OpenRouter");
-  }
+    // Convert file to base64 data URL for image_url format
+    const base64Data = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(mediaFile);
+    });
 
-  messages.push({
-    role: 'user',
-    content: currentPrompt
-  });
+    // OpenRouter format for vision: array of content objects
+    messages.push({
+      role: 'user',
+      content: [
+        {
+          type: 'text',
+          text: currentPrompt
+        },
+        {
+          type: 'image_url',
+          image_url: {
+            url: base64Data
+          }
+        }
+      ]
+    });
+  } else {
+    // Text-only message
+    messages.push({
+      role: 'user',
+      content: currentPrompt
+    });
+  }
 
   console.log("📤 [OpenRouter API] Sending request:", {
     endpoint: 'openrouter.ai',
-    model: OPENROUTER_MODEL,
+    model: modelToUse,
+    hasMedia: !!mediaFile,
     messagesCount: messages.length,
     timestamp: new Date().toISOString()
   });
@@ -277,7 +301,7 @@ const callOpenRouterAPI = async (history, currentPrompt, mediaFile, contextVerse
         'X-Title': 'Shankhnaad AI'
       },
       body: JSON.stringify({
-        model: OPENROUTER_MODEL,
+        model: modelToUse,
         messages: messages
       })
     });
@@ -334,37 +358,49 @@ const callOpenRouterAPI = async (history, currentPrompt, mediaFile, contextVerse
 const callAIAPI = async (history, currentPrompt, mediaFile, contextVerse) => {
   // Unified AI API caller - tries OpenRouter first, falls back to Gemini
   
-  // If media file is provided, try Gemini first (for multimodal support), but fallback to OpenRouter if rate limited
+  // If media file is provided, try OpenRouter vision model first, then Gemini
   if (mediaFile) {
-    console.log("📸 [AI API] Media file detected, trying Gemini for multimodal support");
+    console.log("📸 [AI API] Media file detected, trying OpenRouter vision model first");
+    
+    // Try OpenRouter vision model first (google/gemma-3-4b-it:free)
+    if (OPENROUTER_API_KEY) {
+      try {
+        const response = await callOpenRouterAPI(history, currentPrompt, mediaFile, contextVerse);
+        console.log("✅ [AI API] OpenRouter vision model succeeded");
+        return response;
+      } catch (error) {
+        console.warn("⚠️ [AI API] OpenRouter vision failed, falling back to Gemini:", error.message);
+        // Fall through to Gemini fallback
+      }
+    }
+    
+    // Fallback to Gemini for media
     if (GEMINI_API_KEY) {
       try {
+        console.log("🔄 [AI API] Using Gemini for media (fallback)...");
         const response = await callGeminiAPI(history, currentPrompt, mediaFile, contextVerse);
         // Check if the response is a rate limit error
         if (isRateLimitError(response)) {
-          console.warn("⚠️ [AI API] Gemini rate limited for media, falling back to OpenRouter without media");
-          // Fallback to OpenRouter without media file with specific rate limit message
-          if (OPENROUTER_API_KEY) {
-            const rateLimitNote = "\n\n[Note: A media file was attached but couldn't be processed. Gemini (which supports image analysis) is currently rate limited. The Llama 3.1 405B model doesn't support images. Please try again in a few moments, or describe the image in text.]";
-            return await callOpenRouterAPI(history, currentPrompt + rateLimitNote, null, contextVerse);
-          }
+          console.warn("⚠️ [AI API] Gemini also rate limited for media");
+          return "Both AI services are currently experiencing high demand. Please try again in a few moments, or describe the image in text.";
         }
+        console.log("✅ [AI API] Gemini succeeded for media");
         return response;
       } catch (error) {
-        console.warn("⚠️ [AI API] Gemini failed for media, trying OpenRouter without media:", error.message);
-        if (OPENROUTER_API_KEY) {
-          return await callOpenRouterAPI(history, currentPrompt + MEDIA_FALLBACK_NOTE, null, contextVerse);
-        }
-        throw error;
+        console.error("❌ [AI API] Both OpenRouter and Gemini failed for media:", error.message);
+        return "Unable to process the media file at the moment. Please try again later or describe the content in text.";
       }
     }
+    
+    // If no API is configured for media
+    return "Media analysis requires either OpenRouter or Gemini API to be configured. Please describe the content in text instead.";
   }
 
   // Try OpenRouter first for text
   if (OPENROUTER_API_KEY) {
     try {
       console.log("🚀 [AI API] Attempting OpenRouter (primary)...");
-      const response = await callOpenRouterAPI(history, currentPrompt, mediaFile, contextVerse);
+      const response = await callOpenRouterAPI(history, currentPrompt, null, contextVerse);
       console.log("✅ [AI API] OpenRouter succeeded");
       return response;
     } catch (error) {
