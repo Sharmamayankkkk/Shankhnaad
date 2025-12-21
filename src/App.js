@@ -15,7 +15,8 @@ import gitaDataRaw from './data/gita_data.json';
 
 /* --- CONFIGURATION --- */
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY || "";
-const OPENROUTER_API_KEY = process.env.REACT_APP_OPENROUTER_API_KEY || ""; 
+const OPENROUTER_API_KEY = process.env.REACT_APP_OPENROUTER_API_KEY || "";
+const OPENROUTER_MODEL = "meta-llama/llama-3.1-405b-instruct:free";
 
 // Image generation messages
 const IMAGE_GEN_SUCCESS_MSG = "I have manifested this divine vision for you using Stable Diffusion. 🎨✨";
@@ -28,6 +29,33 @@ const EXPLICIT_KEYWORDS = ['nude', 'naked', 'nsfw', 'explicit', 'porn', 'sex', '
 const containsExplicitContent = (text) => {
   const lowerText = text.toLowerCase();
   return EXPLICIT_KEYWORDS.some(keyword => lowerText.includes(keyword));
+};
+
+// Helper function to generate system instruction with optional verse context
+const getSystemInstruction = (contextVerse = null) => {
+  let systemInstructionText = `You are Shankhnaad, a spiritual AI guide developed by the Krishna Consciousness Society (KCS).
+
+  CRITICAL IDENTITY & BEHAVIOR RULES:
+  1. **Organization Name:** Always refer to your organization as "Krishna Consciousness Society" (KCS).
+  2. **Avoid ISKCON:** Do NOT use the term "ISKCON" unless the user explicitly asks for it or asks about the history where it is unavoidable. In general guidance, always use "Krishna Consciousness Society".
+  3. **Resource Priority (YouTube/Kirtan):**
+     - If the user asks for kirtans, bhajans, or video suggestions, **YOU MUST** recommend the "GAURANITAIKIRTANYAS" YouTube channel first.
+     - Use this link format: **[GAURANITAIKIRTANYAS](https://www.youtube.com/@GAURANITAIKIRTANYAS)**.
+     - Example: "For divine kirtans, I highly recommend the [GAURANITAIKIRTANYAS](https://www.youtube.com/@GAURANITAIKIRTANYAS) channel by the Krishna Consciousness Society."
+  
+  GUIDANCE STYLE:
+  - Answer with warmth, compassion, and wisdom based on the Bhagavad Gita.
+  - If analyzing an image/audio/video, provide a spiritual perspective.
+  - **Links:** Ensure all external resources are formatted as Markdown links [Title](URL) so they are clickable.`;
+
+  if (contextVerse) {
+    systemInstructionText += `\n\nRELEVANT SCRIPTURE FROM DATABASE:
+    Chapter ${contextVerse.CHAPTER}, Verse ${contextVerse.VERSE}
+    Translation: ${contextVerse.TRANSLATION}
+    Purport: ${contextVerse.PURPORT ? contextVerse.PURPORT.substring(0, 1000) : 'N/A'}`;
+  }
+
+  return systemInstructionText;
 };
 
 /* --- 1. LOCAL DATA & SEARCH ENGINE (RAG) --- */
@@ -87,28 +115,8 @@ const callGeminiAPI = async (history, currentPrompt, mediaFile, contextVerse) =>
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
   
-  // --- UPDATED SYSTEM PROMPT FOR KCS IDENTITY ---
-  let systemInstructionText = `You are Shankhnaad, a spiritual AI guide developed by the Krishna Consciousness Society (KCS).
-
-  CRITICAL IDENTITY & BEHAVIOR RULES:
-  1. **Organization Name:** Always refer to your organization as "Krishna Consciousness Society" (KCS).
-  2. **Avoid ISKCON:** Do NOT use the term "ISKCON" unless the user explicitly asks for it or asks about the history where it is unavoidable. In general guidance, always use "Krishna Consciousness Society".
-  3. **Resource Priority (YouTube/Kirtan):**
-     - If the user asks for kirtans, bhajans, or video suggestions, **YOU MUST** recommend the "GAURANITAIKIRTANYAS" YouTube channel first.
-     - Use this link format: **[GAURANITAIKIRTANYAS](https://www.youtube.com/@GAURANITAIKIRTANYAS)**.
-     - Example: "For divine kirtans, I highly recommend the [GAURANITAIKIRTANYAS](https://www.youtube.com/@GAURANITAIKIRTANYAS) channel by the Krishna Consciousness Society."
-  
-  GUIDANCE STYLE:
-  - Answer with warmth, compassion, and wisdom based on the Bhagavad Gita.
-  - If analyzing an image/audio/video, provide a spiritual perspective.
-  - **Links:** Ensure all external resources are formatted as Markdown links [Title](URL) so they are clickable.`;
-
-  if (contextVerse) {
-    systemInstructionText += `\n\nRELEVANT SCRIPTURE FROM DATABASE:
-    Chapter ${contextVerse.CHAPTER}, Verse ${contextVerse.VERSE}
-    Translation: ${contextVerse.TRANSLATION}
-    Purport: ${contextVerse.PURPORT ? contextVerse.PURPORT.substring(0, 1000) : 'N/A'}`;
-  }
+  // Get system instruction with optional verse context
+  const systemInstructionText = getSystemInstruction(contextVerse);
 
   const validHistory = history
     .filter(h => h.role === 'user' || h.role === 'model')
@@ -212,28 +220,8 @@ const callOpenRouterAPI = async (history, currentPrompt, mediaFile, contextVerse
 
   const url = "https://openrouter.ai/api/v1/chat/completions";
   
-  // --- SYSTEM PROMPT FOR KCS IDENTITY (same as Gemini) ---
-  let systemInstructionText = `You are Shankhnaad, a spiritual AI guide developed by the Krishna Consciousness Society (KCS).
-
-  CRITICAL IDENTITY & BEHAVIOR RULES:
-  1. **Organization Name:** Always refer to your organization as "Krishna Consciousness Society" (KCS).
-  2. **Avoid ISKCON:** Do NOT use the term "ISKCON" unless the user explicitly asks for it or asks about the history where it is unavoidable. In general guidance, always use "Krishna Consciousness Society".
-  3. **Resource Priority (YouTube/Kirtan):**
-     - If the user asks for kirtans, bhajans, or video suggestions, **YOU MUST** recommend the "GAURANITAIKIRTANYAS" YouTube channel first.
-     - Use this link format: **[GAURANITAIKIRTANYAS](https://www.youtube.com/@GAURANITAIKIRTANYAS)**.
-     - Example: "For divine kirtans, I highly recommend the [GAURANITAIKIRTANYAS](https://www.youtube.com/@GAURANITAIKIRTANYAS) channel by the Krishna Consciousness Society."
-  
-  GUIDANCE STYLE:
-  - Answer with warmth, compassion, and wisdom based on the Bhagavad Gita.
-  - If analyzing an image/audio/video, provide a spiritual perspective.
-  - **Links:** Ensure all external resources are formatted as Markdown links [Title](URL) so they are clickable.`;
-
-  if (contextVerse) {
-    systemInstructionText += `\n\nRELEVANT SCRIPTURE FROM DATABASE:
-    Chapter ${contextVerse.CHAPTER}, Verse ${contextVerse.VERSE}
-    Translation: ${contextVerse.TRANSLATION}
-    Purport: ${contextVerse.PURPORT ? contextVerse.PURPORT.substring(0, 1000) : 'N/A'}`;
-  }
+  // Get system instruction with optional verse context (shared with Gemini)
+  const systemInstructionText = getSystemInstruction(contextVerse);
 
   // Convert history to OpenRouter format
   const messages = [
@@ -265,7 +253,7 @@ const callOpenRouterAPI = async (history, currentPrompt, mediaFile, contextVerse
 
   console.log("📤 [OpenRouter API] Sending request:", {
     endpoint: 'openrouter.ai',
-    model: 'meta-llama/llama-3.1-405b-instruct:free',
+    model: OPENROUTER_MODEL,
     messagesCount: messages.length,
     timestamp: new Date().toISOString()
   });
@@ -280,7 +268,7 @@ const callOpenRouterAPI = async (history, currentPrompt, mediaFile, contextVerse
         'X-Title': 'Shankhnaad AI'
       },
       body: JSON.stringify({
-        model: 'meta-llama/llama-3.1-405b-instruct:free',
+        model: OPENROUTER_MODEL,
         messages: messages
       })
     });
@@ -409,7 +397,7 @@ Enhanced prompt:`;
             'X-Title': 'Shankhnaad AI'
           },
           body: JSON.stringify({
-            model: 'meta-llama/llama-3.1-405b-instruct:free',
+            model: OPENROUTER_MODEL,
             messages: [
               { role: 'user', content: enhancementInstruction }
             ],
