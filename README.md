@@ -2,11 +2,12 @@
 
 **Live at:** [https://shankhnaad.krishnaconnect.org/](https://shankhnaad.krishnaconnect.org/)
 
-A spiritual AI chatbot powered by OpenRouter (Llama 3.1 405B) and Google's Gemini AI as fallback, offering wisdom from the Bhagavad Gita and AI-enhanced image generation capabilities.
+A spiritual AI chatbot with **local and cloud AI models**, offering wisdom from the Bhagavad Gita and AI-enhanced image generation capabilities. Run models locally in your browser to avoid rate limits!
 
 ## ✨ Features
 
 - 💬 **AI Chat**: Powered by OpenRouter (Llama 3.1 405B Instruct) with Gemini as fallback for reliable spiritual guidance
+- 🖥️ **Local AI Models**: Run AI models directly in your browser - no API keys, no rate limits! (NEW!)
 - 🎨 **AI Image Generation**: Create stunning artwork using Stable Diffusion with AI-enhanced prompts
 - 🤖 **Intelligent Detection**: Automatically detects image requests in natural conversation
 - 🖼️ **Image Preview**: Click to view full-size images in modal with download option
@@ -16,7 +17,26 @@ A spiritual AI chatbot powered by OpenRouter (Llama 3.1 405B) and Google's Gemin
 - 📱 **Responsive Design**: Optimized for all screen sizes
 - 🎭 **Loading Animations**: Gemini-style loading with video support
 - 🛡️ **Content Safety**: Explicit content filtering
-- 🔄 **Smart Fallback**: Automatically switches to Gemini if OpenRouter has rate limits or issues
+- 🔄 **Smart Fallback**: Automatically switches between local and cloud models based on availability
+
+## 🆕 Local Models - No Rate Limits!
+
+**Run AI models locally in your browser!**
+
+### Benefits
+- ✅ No API keys required
+- ✅ No rate limits - unlimited usage
+- ✅ 100% privacy - data stays in your browser
+- ✅ Works offline after initial model download
+- ✅ Automatically used when cloud APIs are rate limited
+
+### Quick Setup
+1. Open Settings (⚙️)
+2. Toggle "Use Local Model" ON
+3. Wait for model download (~250MB first time)
+4. Start chatting with no limits!
+
+**See:** [LOCAL_MODELS_SETUP.md](./LOCAL_MODELS_SETUP.md) for detailed guide
 
 ## Quick Start
 
@@ -81,18 +101,27 @@ For more details, see: **[IMAGE_GENERATION_SETUP.md](./IMAGE_GENERATION_SETUP.md
 Create a `.env` file in the root directory:
 
 ```env
+# Cloud AI APIs (Optional - if not set, local models will be used)
 # Primary AI API - OpenRouter with Llama 3.1 405B Instruct (Free)
 REACT_APP_OPENROUTER_API_KEY=your_openrouter_api_key
 
 # Fallback AI API - used when OpenRouter has issues or for multimodal features
 REACT_APP_GEMINI_API_KEY=your_gemini_api_key
 
-# Image generation works without any token!
+# Local Models Configuration
+# Enable local models (default: true)
+REACT_APP_ENABLE_LOCAL_MODELS=true
+
+# Model preference: 'local', 'cloud', or 'auto' (default: 'auto')
+# - 'auto': Try cloud first, fallback to local if rate limited
+# - 'local': Always use local model first
+# - 'cloud': Always use cloud API
+REACT_APP_LOCAL_MODEL_PREFERENCE=auto
 ```
 
-**Note:** The app will work with either API key, but having both provides the best experience:
-- OpenRouter (Llama 3.1 405B Instruct) is used as the primary API for optimal performance
-- Gemini is used as fallback when OpenRouter has rate limits or for multimodal features (image/audio/video analysis)
+**Note:** The app now works **without any API keys** using local models! Having cloud API keys provides the best of both worlds:
+- Cloud APIs for better quality and multimodal features
+- Local models as fallback to avoid rate limits
 
 ## 🎭 Custom Loading Animation
 
