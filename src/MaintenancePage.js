@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 // Material Design Maintenance Page - Dark Mode (Google Gemini Style)
 export default function MaintenancePage() {
+  const [imageError, setImageError] = useState(false);
+
   return (
     <div className="min-h-screen bg-[#131314] flex items-center justify-center p-4 font-sans">
       {/* Main Content Card - Material Design */}
@@ -12,19 +14,18 @@ export default function MaintenancePage() {
           {/* Logo Section */}
           <div className="flex justify-center mb-8">
             <div className="relative">
-              <img 
-                src="/logo.png" 
-                alt="Shankhnaad Logo" 
-                className="w-24 h-24 md:w-28 md:h-28 rounded-full shadow-lg"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextElementSibling.style.display = 'flex';
-                }}
-              />
-              {/* Fallback OM symbol if logo fails to load */}
-              <div className="w-24 h-24 md:w-28 md:h-28 rounded-full bg-[#333537] hidden items-center justify-center text-5xl text-[#e3e3e3] font-bold shadow-lg">
-                ॐ
-              </div>
+              {!imageError ? (
+                <img 
+                  src="/logo.png" 
+                  alt="Shankhnaad Logo" 
+                  className="w-24 h-24 md:w-28 md:h-28 rounded-full shadow-lg"
+                  onError={() => setImageError(true)}
+                />
+              ) : (
+                <div className="w-24 h-24 md:w-28 md:h-28 rounded-full bg-[#333537] flex items-center justify-center text-5xl text-[#e3e3e3] font-bold shadow-lg">
+                  ॐ
+                </div>
+              )}
             </div>
           </div>
 
@@ -41,13 +42,17 @@ export default function MaintenancePage() {
           {/* Divider */}
           <div className="border-t border-[#444746] mb-8"></div>
 
+          {/* Lost in Maya - Now at the top */}
+          <div className="text-center mb-6">
+            <p className="text-sm text-gray-500 italic mb-6">
+              "Lost in Maya"
+            </p>
+          </div>
+
           {/* Maintenance Notice - Material Design */}
           <div className="text-center mb-8">
-            <h2 className="text-xl md:text-2xl font-medium text-[#e3e3e3] mb-4">
-              Technical Maintenance
-            </h2>
             <p className="text-base md:text-lg text-[#e3e3e3] leading-relaxed mb-3">
-              We are undergoing technical maintenance
+              We are undergoing technical maintenance to serve you all better
             </p>
             <p className="text-sm md:text-base text-gray-400">
               We will soon be back again
@@ -59,12 +64,9 @@ export default function MaintenancePage() {
 
           {/* Spiritual Message */}
           <div className="text-center mb-6">
-            <p className="text-sm text-gray-500 italic mb-4">
-              "Lost in Maya"
-            </p>
-            <h3 className="text-base md:text-lg font-medium text-[#e3e3e3] mb-6">
+            <p className="text-base md:text-lg font-medium text-[#e3e3e3] mb-6">
               Till then, chant the Hare Krishna Mahamantra
-            </h3>
+            </p>
           </div>
 
           {/* Mahamantra - English */}
