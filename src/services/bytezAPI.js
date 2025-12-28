@@ -15,6 +15,15 @@ const BYTEZ_BASE_URL = process.env.REACT_APP_BYTEZ_ENDPOINT || 'https://api.byte
 const MODEL_ID = 'openai/gpt-oss-20b';
 
 /**
+ * System prompt for spiritual guidance
+ * Optimized for Shankhnaad's Krishna Consciousness focus
+ */
+const SPIRITUAL_GUIDANCE_SYSTEM_PROMPT = `You are a spiritual guide for the Shankhnaad platform, providing wisdom based on the Bhagavad Gita and Krishna Consciousness. 
+Respond with compassion, clarity, and spiritual insight. 
+Draw from Vedic wisdom and the teachings of Lord Krishna when appropriate.
+Keep responses thoughtful but concise.`;
+
+/**
  * Check if Bytez API is configured
  * @returns {boolean} True if API key is available
  */
@@ -44,7 +53,9 @@ export const callBytezAPI = async (prompt, options = {}) => {
 
   try {
     // Construct the API endpoint
-    // Note: The actual endpoint structure needs to be verified
+    // IMPORTANT: The actual endpoint structure needs to be verified with Bytez.com documentation
+    // This is an assumed structure. Actual endpoint may be different.
+    // TODO: Verify endpoint structure at https://bytez.com/docs/api
     const endpoint = `${BYTEZ_BASE_URL}/models/${MODEL_ID}/generate`;
 
     // Prepare the request body
@@ -116,13 +127,8 @@ export const callBytezAPI = async (prompt, options = {}) => {
  * @returns {Promise<Object>} API response with spiritual guidance
  */
 export const callBytezForSpiritualGuidance = async (userMessage) => {
-  const systemPrompt = `You are a spiritual guide for the Shankhnaad platform, providing wisdom based on the Bhagavad Gita and Krishna Consciousness. 
-Respond with compassion, clarity, and spiritual insight. 
-Draw from Vedic wisdom and the teachings of Lord Krishna when appropriate.
-Keep responses thoughtful but concise.`;
-
   return await callBytezAPI(userMessage, {
-    systemPrompt,
+    systemPrompt: SPIRITUAL_GUIDANCE_SYSTEM_PROMPT,
     temperature: 0.7,
     maxTokens: 800,
   });

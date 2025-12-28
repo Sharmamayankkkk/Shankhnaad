@@ -44,7 +44,7 @@ export const AI_MODELS = {
     displayName: 'GPT-OSS-20B (Optional)',
     modelId: 'openai/gpt-oss-20b',
     description: 'Open source 20B parameter model for fast inference',
-    contextLength: 4096, // Estimated - needs verification
+    contextLength: 4096, // TODO: Verify actual context length from Bytez.com documentation
     parameters: '20B',
     priority: 3,
     active: false, // Not active by default - requires verification
@@ -151,7 +151,15 @@ export const getDefaultModel = () => {
  */
 export const getFallbackModel = (excludeModelId) => {
   const models = getModelsByPriority()
-    .filter(m => m.id !== excludeModelId && isModelConfigured(m.id.toUpperCase().replace(/-/g, '_')));
+    .filter(m => {
+      if (m.id === excludeModelId) return false;
+      
+      // Check if model is configured by looking up its key in AI_MODELS
+      const modelKey = Object.keys(AI_MODELS).find(key => AI_MODELS[key].id === m.id);
+      if (!modelKey) return false;
+      
+      return isModelConfigured(modelKey);
+    });
   
   return models.length > 0 ? models[0] : null;
 };
