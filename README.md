@@ -87,12 +87,38 @@ REACT_APP_OPENROUTER_API_KEY=your_openrouter_api_key
 # Fallback AI API - used when OpenRouter has issues or for multimodal features
 REACT_APP_GEMINI_API_KEY=your_gemini_api_key
 
+# Optional: Bytez.com GPT-OSS-20B (Under Evaluation)
+# See BYTEZ_INTEGRATION_GUIDE.md and MODEL_EVALUATION.md for details
+REACT_APP_BYTEZ_API_KEY=
+
 # Image generation works without any token!
 ```
 
 **Note:** The app will work with either API key, but having both provides the best experience:
 - OpenRouter (Llama 3.1 405B Instruct) is used as the primary API for optimal performance
 - Gemini is used as fallback when OpenRouter has rate limits or for multimodal features (image/audio/video analysis)
+- Bytez GPT-OSS-20B is under evaluation as an optional third model (see [MODEL_EVALUATION.md](./MODEL_EVALUATION.md))
+
+## 🔍 AI Model Options
+
+### Current Models
+1. **Llama 3.1 405B** (Primary) - Via OpenRouter
+   - 405 billion parameters
+   - Excellent reasoning capabilities
+   - Best for complex spiritual guidance
+
+2. **Gemini Pro** (Fallback) - Via Google
+   - Multimodal capabilities
+   - High reliability
+   - Used when OpenRouter unavailable
+
+### Under Evaluation
+3. **GPT-OSS-20B** (Optional) - Via Bytez.com
+   - 20 billion parameters
+   - Faster response times
+   - Under evaluation - see [BYTEZ_INTEGRATION_GUIDE.md](./BYTEZ_INTEGRATION_GUIDE.md)
+
+For detailed model comparison and evaluation, see [MODEL_EVALUATION.md](./MODEL_EVALUATION.md).
 
 ## 🎭 Custom Loading Animation
 
